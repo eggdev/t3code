@@ -6,7 +6,12 @@ import * as NodePath from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { withClydeGitSafety } from "./VcsProcess.ts";
+import { explicitBareRepositoryEnv } from "./VcsProcess.ts";
+
+const withSafety = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) => ({
+  ...env,
+  ...explicitBareRepositoryEnv(env, platform),
+});
 
 const git = (cwd: string, args: ReadonlyArray<string>, env: NodeJS.ProcessEnv) =>
   NodeChildProcess.spawnSync("git", args, {
@@ -15,35 +20,53 @@ const git = (cwd: string, args: ReadonlyArray<string>, env: NodeJS.ProcessEnv) =
     encoding: "utf8",
   });
 
-describe("withClydeGitSafety", () => {
+describe("explicitBareRepositoryEnv with the Clyde git safety config", () => {
   it("adds the safety entries after the inherited command-line config", () => {
-    const env = withClydeGitSafety(
-      { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "a.b", GIT_CONFIG_VALUE_0: "c" },
+    const env = withSafety(
+      {
+        T3CODE_SANDBOX_SSH_TARGET: "agent@sandbox",
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "a.b",
+        GIT_CONFIG_VALUE_0: "c",
+      },
       "darwin",
     );
     expect(env).toMatchObject({
-      GIT_CONFIG_COUNT: "4",
+      GIT_CONFIG_COUNT: "5",
       GIT_CONFIG_KEY_0: "a.b",
-      GIT_CONFIG_KEY_1: "safe.directory",
-      GIT_CONFIG_VALUE_1: "/opt/clyde/worktrees/*",
-      GIT_CONFIG_KEY_2: "core.hooksPath",
-      GIT_CONFIG_VALUE_2: "/dev/null",
-      GIT_CONFIG_KEY_3: "core.fsmonitor",
-      GIT_CONFIG_VALUE_3: "false",
+      GIT_CONFIG_KEY_1: "safe.bareRepository",
+      GIT_CONFIG_KEY_2: "safe.directory",
+      GIT_CONFIG_VALUE_2: "/opt/clyde/worktrees/*",
+      GIT_CONFIG_KEY_3: "core.hooksPath",
+      GIT_CONFIG_VALUE_3: "/dev/null",
+      GIT_CONFIG_KEY_4: "core.fsmonitor",
+      GIT_CONFIG_VALUE_4: "false",
+    });
+  });
+
+  it("leaves git config alone when sandbox mode is off", () => {
+    expect(withSafety({}, "linux")).toEqual({
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "safe.bareRepository",
+      GIT_CONFIG_VALUE_0: "explicit",
     });
   });
 
   it("does not run a hook or a monitor command planted in the repository", () => {
     const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "clyde-git-safety-"));
     const marker = NodePath.join(root, "ran");
-    const plain = { GIT_CONFIG_NOSYSTEM: "1", HOME: root };
+    const plain = {
+      GIT_CONFIG_NOSYSTEM: "1",
+      HOME: root,
+      T3CODE_SANDBOX_SSH_TARGET: "agent@sandbox",
+    };
     git(root, ["init", "-q"], plain);
     const hook = NodePath.join(root, ".git", "hooks", "pre-commit");
     NodeFS.writeFileSync(hook, `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 });
     git(root, ["config", "core.fsmonitor", `touch ${marker}`], plain);
     NodeFS.writeFileSync(NodePath.join(root, "file.txt"), "x");
 
-    const safe = withClydeGitSafety(plain, "linux");
+    const safe = withSafety(plain, "linux");
     expect(git(root, ["add", "file.txt"], safe).status).toBe(0);
     expect(git(root, ["status", "--porcelain"], safe).status).toBe(0);
     const commit = git(

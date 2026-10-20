@@ -16,3 +16,7 @@ export const CLYDE_GIT_CONFIG: ReadonlyArray<readonly [string, string]> = [
   ["core.hooksPath", "/dev/null"],
   ["core.fsmonitor", "false"],
 ];
+
+/** Sandbox mode is on when the server runs agents on a sandbox host. */
+export const isSandboxMode = (env: NodeJS.ProcessEnv) =>
+  (env.T3CODE_SANDBOX_SSH_TARGET ?? "").trim().length > 0;

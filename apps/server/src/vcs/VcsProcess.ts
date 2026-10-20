@@ -21,7 +21,7 @@ import {
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
-import { CLYDE_GIT_CONFIG } from "./clydeGitSafety.ts";
+import { CLYDE_GIT_CONFIG, isSandboxMode } from "./clydeGitSafety.ts";
 import * as ProcessRunner from "../processRunner.ts";
 
 export interface VcsProcessInput {
@@ -114,14 +114,14 @@ export const gitConfigEnv = (
  * form one, so git started by T3 (or by gh and friends) only opens a bare
  * repository named with `--git-dir` or `GIT_DIR`. Git before 2.38 ignores it.
  */
-export const explicitBareRepositoryEnv = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) =>
-  gitConfigEnv(env, "safe.bareRepository", "explicit", platform);
-
-/** Clyde: pins the config in clydeGitSafety.ts on every git process (security rule 25). */
-export const withClydeGitSafety = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) => {
-  const next: NodeJS.ProcessEnv = { ...env };
+export const explicitBareRepositoryEnv = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) => {
+  const next = gitConfigEnv(env, "safe.bareRepository", "explicit", platform);
+  // Clyde: every git the server starts comes through here, so the worktree
+  // safety config goes here too, when agents write the files from a sandbox
+  // (security rule 25, see clydeGitSafety.ts).
+  if (!isSandboxMode(env)) return next;
   for (const [key, value] of CLYDE_GIT_CONFIG) {
-    Object.assign(next, gitConfigEnv({ ...process.env, ...next }, key, value, platform));
+    Object.assign(next, gitConfigEnv({ ...env, ...next }, key, value, platform));
   }
   return next;
 };
@@ -203,13 +203,10 @@ export const make = Effect.gen(function* () {
         ...(input.spawnCwd !== undefined ? { spawnCwd: input.spawnCwd } : {}),
         ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
         ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
-        env: withClydeGitSafety(
-          {
-            ...input.env,
-            ...explicitBareRepositoryEnv({ ...process.env, ...input.env }, hostPlatform),
-          },
-          hostPlatform,
-        ),
+        env: {
+          ...input.env,
+          ...explicitBareRepositoryEnv({ ...process.env, ...input.env }, hostPlatform),
+        },
         timeout: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         maxOutputBytes: input.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
         outputMode: input.outputMode ?? "truncate",
