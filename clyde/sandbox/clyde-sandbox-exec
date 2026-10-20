@@ -29,6 +29,15 @@ CODEX_GATEWAY_ARGS = [
 ]
 
 
+def with_gateway(args):
+    """Put the gateway flags right after Codex's subcommand. A `-c` after the
+    subcommand replaces the root `-c` flags, so the gateway flags must sit
+    there too, before any `-c` the caller passes."""
+    if args and not args[0].startswith("-"):
+        return [args[0], *CODEX_GATEWAY_ARGS, *args[1:]]
+    return [*CODEX_GATEWAY_ARGS, *args]
+
+
 def refuse(message):
     sys.stderr.write(f"clyde-sandbox-exec: {message}\n")
     sys.exit(126)
@@ -69,7 +78,7 @@ def main():
     real, project = project_of(directory)
     home = os.path.join(HOME_ROOT, project)
     os.makedirs(home, exist_ok=True)
-    cli = [command, *CODEX_GATEWAY_ARGS, *args] if command == "codex" else [command, *args]
+    cli = [command, *with_gateway(args)] if command == "codex" else [command, *args]
     docker = [
         "docker", "run", "--rm", "-i",
         "--name", f"clyde-sbx-{project}-{secrets.token_hex(4)}",
