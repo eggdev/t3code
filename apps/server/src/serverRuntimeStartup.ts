@@ -340,7 +340,7 @@ const resolveStartupBrowserTarget = Effect.gen(function* () {
       ? `http://${formatHostForUrl(serverConfig.host)}:${serverConfig.port}`
       : localUrl;
   const baseTarget = serverConfig.devUrl?.toString() ?? bindUrl;
-  return serverConfig.mode === "desktop"
+  return serverConfig.mode === "desktop" || serverConfig.tailscaleOwnerLogin !== undefined
     ? baseTarget
     : yield* serverAuth.issueStartupPairingUrl(baseTarget);
 });

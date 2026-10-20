@@ -3,6 +3,7 @@ import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
   AuthStandardClientScopes,
+  authScopeResponse,
   AuthGrantScope,
   EnvironmentAuthInvalidError,
   type EnvironmentAuthInvalidReason,
@@ -34,6 +35,8 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as SessionStore from "./SessionStore.ts";
+import { resolveTailscaleOwnerFromRequest } from "./TailscaleIdentityAuth.ts";
+import * as ServerConfig from "../config.ts";
 import { traceAuthenticatedRelayRequest, traceRelayRequest } from "../cloud/traceRelayRequest.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
 import { verifyRequestDpopProof } from "./dpop.ts";
@@ -265,6 +268,7 @@ export const layer = HttpApiBuilder.group(
   Effect.fnUntraced(function* (handlers) {
     const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
     const sessions = yield* SessionStore.SessionStore;
+    const serverConfig = yield* ServerConfig.ServerConfig;
 
     return handlers
       .handle(
@@ -287,6 +291,32 @@ export const layer = HttpApiBuilder.group(
             ) {
               yield* appendSessionCookie(sessions.cookieName, credential.token, result.expiresAt);
               yield* appendCredentialResponseHeaders;
+            }
+            const owner = result.authenticated
+              ? undefined
+              : resolveTailscaleOwnerFromRequest(serverConfig, request);
+            if (owner) {
+              const issued = yield* sessions
+                .issue({
+                  method: "browser-session-cookie",
+                  subject: owner.subject,
+                  scopes: AuthStandardClientScopes,
+                  client: { ...deriveAuthClientMetadata({ request }), label: owner.label },
+                })
+                .pipe(
+                  Effect.catch((error) =>
+                    failEnvironmentInternal("browser_session_cookie_failed", error),
+                  ),
+                );
+              yield* appendSessionCookie(sessions.cookieName, issued.token, issued.expiresAt);
+              yield* appendCredentialResponseHeaders;
+              return {
+                authenticated: true,
+                auth: result.auth,
+                ...authScopeResponse(issued.scopes),
+                sessionMethod: issued.method,
+                expiresAt: DateTime.toUtc(issued.expiresAt),
+              };
             }
             return result;
           },

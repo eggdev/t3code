@@ -163,6 +163,10 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  tailscaleOwnerLogin: Config.String("T3CODE_TAILSCALE_OWNER_LOGIN").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
 });
 
 const DevAuthTokenConfig = Config.Redacted("T3CODE_DEV_AUTH_TOKEN").pipe(
@@ -466,6 +470,9 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     staticDir,
     devUrl,
     ...(devAuthToken === undefined ? {} : { devAuthToken }),
+    ...(env.tailscaleOwnerLogin === undefined
+      ? {}
+      : { tailscaleOwnerLogin: env.tailscaleOwnerLogin }),
     devAllowedOrigins: env.devAllowedOrigins,
     noBrowser,
     startupPresentation,
