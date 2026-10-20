@@ -91,6 +91,10 @@ def main():
         "-e", f"HTTP_PROXY={EGRESS}", "-e", f"HTTPS_PROXY={EGRESS}",
         "-e", f"http_proxy={EGRESS}", "-e", f"https_proxy={EGRESS}",
         "-e", "NO_PROXY=model-gateway", "-e", "no_proxy=model-gateway",
+        # Claude calls the gateway, which swaps the placeholder for the
+        # owner's subscription token. Codex gets its gateway from -c flags.
+        "-e", f"ANTHROPIC_BASE_URL={GATEWAY}/anthropic",
+        "-e", "ANTHROPIC_AUTH_TOKEN=clyde-gateway-placeholder",
         "-v", f"{home}:/home/agent",
         "-v", f"{real}:{real}",
         "-w", real,
