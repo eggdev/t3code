@@ -2,14 +2,15 @@
 
 How to operate production. Open only the page you need.
 
-| Page                                        | Open it when                                         |
-| ------------------------------------------- | ---------------------------------------------------- |
-| [Rollback](./rollback.md)                   | A deploy broke production                            |
-| [Secret rotation](./secret-rotation.md)     | A key leaked, expires or is due for rotation         |
-| [Operator accounts](./operator-accounts.md) | You need a vendor account, a token or access back    |
-| [Production access](./production-access.md) | You or an agent needs to read production data        |
-| [Disaster recovery](./disaster-recovery.md) | Data is lost, or a store needs a restore drill       |
-| [Security](../security.md)                  | You change auth, headers, logs or deploy permissions |
+| Page                                        | Open it when                                           |
+| ------------------------------------------- | ------------------------------------------------------ |
+| [Rollback](./rollback.md)                   | A deploy broke production                              |
+| [Secret rotation](./secret-rotation.md)     | A key leaked, expires or is due for rotation           |
+| [Operator accounts](./operator-accounts.md) | You need a vendor account, a token or access back      |
+| [Production access](./production-access.md) | You or an agent needs to read production data          |
+| [Disaster recovery](./disaster-recovery.md) | Data is lost, or a store needs a restore drill         |
+| [Worktree mount](./worktree-mount.md)       | You set up a sandbox host, or the worktree mount fails |
+| [Security](../security.md)                  | You change auth, headers, logs or deploy permissions   |
 
 ## Runbook shape
 
