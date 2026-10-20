@@ -13,6 +13,7 @@ import {
   AuthAccessTokenResult,
   AuthBrowserSessionRequest,
   AuthBrowserSessionResult,
+  AuthClientMetadataDeviceType,
   AuthClientSession,
   AuthCreatePairingCredentialInput,
   AuthMcpApprovalDecisionRequest,
@@ -105,6 +106,8 @@ export type EnvironmentAuthInvalidReason = typeof EnvironmentAuthInvalidReason.T
 
 export const EnvironmentOperationForbiddenReason = Schema.Literals([
   "current_session_revoke_not_allowed",
+  // Clyde: an owner login turns pairing grants off.
+  "pairing_off",
 ]);
 export type EnvironmentOperationForbiddenReason = typeof EnvironmentOperationForbiddenReason.Type;
 
@@ -199,6 +202,9 @@ export class EnvironmentOperationForbiddenError extends Schema.TaggedError<Envir
   }
 
   override get message(): string {
+    if (this.reason === "pairing_off") {
+      return "Pairing is off: sign in with Tailscale.";
+    }
     return `The environment refused this operation (${this.reason}).`;
   }
 }
@@ -333,11 +339,13 @@ export class EnvironmentCloudEndpointUnavailableError extends Schema.TaggedError
 }
 const EnvironmentSessionCreationErrors = [
   EnvironmentAuthInvalidError,
+  EnvironmentOperationForbiddenError,
   EnvironmentInternalError,
 ] as const;
 const EnvironmentTokenExchangeErrors = [
   EnvironmentRequestInvalidError,
   EnvironmentAuthInvalidError,
+  EnvironmentOperationForbiddenError,
   EnvironmentInternalError,
 ] as const;
 const EnvironmentScopedOperationErrors = [
@@ -346,6 +354,7 @@ const EnvironmentScopedOperationErrors = [
 ] as const;
 const EnvironmentPairingCredentialErrors = [
   EnvironmentRequestInvalidError,
+  EnvironmentOperationForbiddenError,
   ...EnvironmentScopedOperationErrors,
 ] as const;
 const EnvironmentSessionRevokeErrors = [
@@ -532,6 +541,13 @@ class EnvironmentMetadataHttpApi extends HttpApiGroup.make("metadata").add(
   }),
 ) {}
 
+// Clyde: the owner's Tailscale identity stands in for a pairing grant.
+const AuthTailscaleTokenRequest = Schema.Struct({
+  client_label: Schema.optionalKey(TrimmedNonEmptyString),
+  client_device_type: Schema.optionalKey(AuthClientMetadataDeviceType),
+  client_os: Schema.optionalKey(TrimmedNonEmptyString),
+}).pipe(HttpApiSchema.asFormUrlEncoded());
+
 class EnvironmentAuthHttpApi extends HttpApiGroup.make("auth")
   .add(
     HttpApiEndpoint.get("session", "/api/auth/session", {
@@ -553,6 +569,14 @@ class EnvironmentAuthHttpApi extends HttpApiGroup.make("auth")
       payload: AuthTokenExchangeRequest,
       success: AuthAccessTokenResult,
       error: EnvironmentTokenExchangeErrors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("tailscaleToken", "/api/auth/tailscale-token", {
+      headers: OptionalDpopProofHeaders,
+      payload: AuthTailscaleTokenRequest,
+      success: AuthAccessTokenResult,
+      error: [EnvironmentAuthInvalidError, EnvironmentInternalError],
     }),
   )
   .add(

@@ -1,6 +1,18 @@
+import {
+  AuthAccessTokenType,
+  AuthStandardClientScopes,
+  type AuthAccessTokenResult,
+  type AuthClientMetadata,
+} from "@t3tools/contracts";
+import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import type { HttpServerRequest } from "effect/http";
 
 import type { ServerConfig } from "../config.ts";
+import * as SessionStore from "./SessionStore.ts";
 
 // Clyde signs the owner in from Tailscale Serve's identity header. Serve strips
 // a client-supplied copy of the header and fills it only for user-owned
@@ -20,6 +32,24 @@ export function isLoopbackAddress(address: string | undefined): boolean {
   const normalized = address.startsWith("::ffff:") ? address.slice("::ffff:".length) : address;
   return LOOPBACK_ADDRESSES.has(normalized);
 }
+
+// An owner login puts the server in owner mode: the owner signs in with
+// Tailscale, and T3 Code's pairing grants are off (docs/contributing/security.md
+// rule 18).
+export function isTailscaleOwnerMode(
+  config: Pick<ServerConfig["Service"], "tailscaleOwnerLogin">,
+): boolean {
+  return (config.tailscaleOwnerLogin?.trim() ?? "") !== "";
+}
+
+const PAIRING_OFF_MESSAGE = "Pairing is off: sign in with Tailscale.";
+
+export class PairingOffError extends Schema.TaggedError<PairingOffError>()("PairingOffError", {}) {
+  override get message(): string {
+    return PAIRING_OFF_MESSAGE;
+  }
+}
+export const isPairingOffError = Schema.is(PairingOffError);
 
 export function resolveTailscaleOwner(input: {
   readonly ownerLogin: string | undefined;
@@ -64,3 +94,38 @@ export function resolveTailscaleOwnerFromRequest(
     remoteAddress: readRemoteAddress(request),
   });
 }
+
+// Matches the pairing exchange in EnvironmentAuth: standard client scopes, the
+// session store's default lifetime for a bearer token, and one hour for a
+// DPoP-bound token.
+const DPOP_ACCESS_TOKEN_TTL = Duration.hours(1);
+
+export const issueTailscaleOwnerAccessToken = Effect.fn("TailscaleIdentityAuth.issueAccessToken")(
+  function* (input: {
+    readonly owner: NonNullable<ReturnType<typeof resolveTailscaleOwner>>;
+    readonly client: AuthClientMetadata;
+    readonly proofKeyThumbprint: string | undefined;
+  }) {
+    const sessions = yield* SessionStore.SessionStore;
+    const issued = yield* sessions.issue({
+      method: input.proofKeyThumbprint ? "dpop-access-token" : "bearer-access-token",
+      subject: input.owner.subject,
+      scopes: AuthStandardClientScopes,
+      ...(input.proofKeyThumbprint
+        ? { proofKeyThumbprint: input.proofKeyThumbprint, ttl: DPOP_ACCESS_TOKEN_TTL }
+        : {}),
+      client: { ...input.client, label: input.client.label ?? input.owner.label },
+    });
+    const now = yield* DateTime.now;
+    return {
+      access_token: issued.token,
+      issued_token_type: AuthAccessTokenType,
+      token_type: input.proofKeyThumbprint ? "DPoP" : "Bearer",
+      expires_in: Math.max(
+        0,
+        Math.floor((issued.expiresAt.epochMilliseconds - now.epochMilliseconds) / 1000),
+      ),
+      scope: encodeOAuthScope(issued.scopes),
+    } satisfies AuthAccessTokenResult;
+  },
+);

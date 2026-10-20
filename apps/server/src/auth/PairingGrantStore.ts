@@ -22,6 +22,7 @@ import * as Stream from "effect/Stream";
 
 import * as ServerConfig from "../config.ts";
 import * as AuthPairingLinks from "../persistence/AuthPairingLinks.ts";
+import { isTailscaleOwnerMode, PairingOffError } from "./TailscaleIdentityAuth.ts";
 
 export interface BootstrapGrant {
   readonly method: ServerAuthBootstrapMethod;
@@ -214,7 +215,10 @@ export class PairingGrantStore extends Context.Service<
       readonly label?: string;
       readonly proofKeyThumbprint?: string;
       readonly purpose?: "startup";
-    }) => Effect.Effect<IssuedBootstrapCredential, BootstrapCredentialInternalError>;
+    }) => Effect.Effect<
+      IssuedBootstrapCredential,
+      BootstrapCredentialInternalError | PairingOffError
+    >;
     readonly listActive: () => Effect.Effect<
       ReadonlyArray<AuthPairingLink>,
       BootstrapCredentialInternalError
@@ -604,14 +608,16 @@ export const make = Effect.gen(function* () {
     },
   );
 
+  // Clyde: owner mode refuses every grant here, so no path can issue or spend one.
+  const pairingOff = isTailscaleOwnerMode(config);
   return PairingGrantStore.of({
-    issueOneTimeToken,
+    issueOneTimeToken: pairingOff ? () => Effect.fail(new PairingOffError()) : issueOneTimeToken,
     listActive,
     get streamChanges() {
       return Stream.fromPubSub(changesPubSub);
     },
     revoke,
-    consume,
+    consume: pairingOff ? () => Effect.fail(new UnavailableBootstrapCredentialError({})) : consume,
   });
 });
 

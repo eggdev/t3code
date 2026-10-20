@@ -1,4 +1,9 @@
-import type { DesktopSshEnvironmentTarget, EnvironmentId } from "@t3tools/contracts";
+import type {
+  AuthAccessTokenResult,
+  AuthClientPresentationMetadata,
+  DesktopSshEnvironmentTarget,
+  EnvironmentId,
+} from "@t3tools/contracts";
 import { resolveRemotePairingTarget } from "@t3tools/shared/remote";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -9,6 +14,8 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as HttpClient from "effect/http/HttpClient";
 
 import { bootstrapRemoteBearerSession } from "../authorization/remote.ts";
+import { requestTailscaleOwnerAccessToken } from "../authorization/tailscaleOwner.ts";
+import { mapTailscaleOwnerTokenError, resolveTailscaleOwnerTarget } from "./tailscaleOwner.ts";
 import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "../environment/endpoint.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
 import * as ClientCapabilities from "../platform/capabilities.ts";
@@ -41,6 +48,11 @@ export interface PairingConnectionInput {
   readonly expectedEnvironmentId?: EnvironmentId;
 }
 
+export interface TailscaleOwnerConnectionInput {
+  readonly address: string;
+  readonly expectedEnvironmentId?: EnvironmentId;
+}
+
 export interface SshConnectionInput {
   readonly target: DesktopSshEnvironmentTarget;
   readonly label?: string;
@@ -58,6 +70,12 @@ export class ConnectionOnboarding extends Context.Service<
   {
     readonly registerPairing: (
       input: PairingConnectionInput,
+    ) => Effect.Effect<
+      EnvironmentId,
+      ConnectionAttemptError | Persistence.ConnectionPersistenceError
+    >;
+    readonly registerTailscaleOwner: (
+      input: TailscaleOwnerConnectionInput,
     ) => Effect.Effect<
       EnvironmentId,
       ConnectionAttemptError | Persistence.ConnectionPersistenceError
@@ -102,6 +120,47 @@ export const preparePairingRegistration = Effect.fn(
   "clientRuntime.connection.onboarding.preparePairingRegistration",
 )(function* (input: PairingConnectionInput) {
   const target = yield* resolvePairingTarget(input);
+  return yield* prepareBearerRegistration({
+    target,
+    ...(input.expectedEnvironmentId === undefined
+      ? {}
+      : { expectedEnvironmentId: input.expectedEnvironmentId }),
+    issueAccessToken: (clientMetadata) =>
+      bootstrapRemoteBearerSession({
+        httpBaseUrl: target.httpBaseUrl,
+        credential: target.credential,
+        clientMetadata,
+      }).pipe(Effect.mapError(mapRemoteEnvironmentError)),
+  });
+});
+
+/** Clyde: registers an environment by its address alone, as the owner over Tailscale. */
+export const prepareTailscaleOwnerRegistration = Effect.fn(
+  "clientRuntime.connection.onboarding.prepareTailscaleOwnerRegistration",
+)(function* (input: TailscaleOwnerConnectionInput) {
+  const target = yield* resolveTailscaleOwnerTarget(input.address);
+  return yield* prepareBearerRegistration({
+    target,
+    ...(input.expectedEnvironmentId === undefined
+      ? {}
+      : { expectedEnvironmentId: input.expectedEnvironmentId }),
+    issueAccessToken: (clientMetadata) =>
+      requestTailscaleOwnerAccessToken({ httpBaseUrl: target.httpBaseUrl, clientMetadata }).pipe(
+        Effect.mapError(mapTailscaleOwnerTokenError),
+      ),
+  });
+});
+
+const prepareBearerRegistration = Effect.fn(
+  "clientRuntime.connection.onboarding.prepareBearerRegistration",
+)(function* <R>(input: {
+  readonly target: { readonly httpBaseUrl: string; readonly wsBaseUrl: string };
+  readonly expectedEnvironmentId?: EnvironmentId;
+  readonly issueAccessToken: (
+    clientMetadata: AuthClientPresentationMetadata,
+  ) => Effect.Effect<AuthAccessTokenResult, ConnectionAttemptError, R>;
+}) {
+  const target = input.target;
   const presentation = yield* ClientCapabilities.ClientPresentation;
   const descriptor = yield* fetchRemoteEnvironmentDescriptor({
     httpBaseUrl: target.httpBaseUrl,
@@ -118,11 +177,7 @@ export const preparePairingRegistration = Effect.fn(
   if (compatibilityError !== null && compatibilityError.serverUpdateRequired !== true) {
     return yield* compatibilityError;
   }
-  const access = yield* bootstrapRemoteBearerSession({
-    httpBaseUrl: target.httpBaseUrl,
-    credential: target.credential,
-    clientMetadata: presentation.metadata,
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  const access = yield* input.issueAccessToken(presentation.metadata);
   const connectionId = bearerConnectionId(descriptor.environmentId, target.httpBaseUrl);
 
   return new BearerConnectionRegistration({
@@ -147,7 +202,18 @@ export const preparePairingRegistration = Effect.fn(
 const registerPairingConnection = Effect.fn(
   "clientRuntime.connection.onboarding.registerPairingConnection",
 )(function* (input: PairingConnectionInput) {
-  const registration = yield* preparePairingRegistration(input);
+  return yield* registerBearerConnection(yield* preparePairingRegistration(input));
+});
+
+const registerTailscaleOwnerConnection = Effect.fn(
+  "clientRuntime.connection.onboarding.registerTailscaleOwnerConnection",
+)(function* (input: TailscaleOwnerConnectionInput) {
+  return yield* registerBearerConnection(yield* prepareTailscaleOwnerRegistration(input));
+});
+
+const registerBearerConnection = Effect.fn(
+  "clientRuntime.connection.onboarding.registerBearerConnection",
+)(function* (registration: BearerConnectionRegistration) {
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
   if (!(yield* registry.register(registration))) return registration.target.environmentId;
   yield* registry.setCompatibility(registration.target.environmentId, null);
@@ -297,6 +363,12 @@ export const make = Effect.gen(function* () {
   return ConnectionOnboarding.of({
     registerPairing: (input) =>
       registerPairingConnection(input).pipe(
+        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+        Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
+        Effect.provideService(HttpClient.HttpClient, httpClient),
+      ),
+    registerTailscaleOwner: (input) =>
+      registerTailscaleOwnerConnection(input).pipe(
         Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
         Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
         Effect.provideService(HttpClient.HttpClient, httpClient),

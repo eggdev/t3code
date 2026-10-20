@@ -11,6 +11,7 @@ import {
   EnvironmentInternalError,
   type EnvironmentInternalErrorReason,
   EnvironmentOperationForbiddenError,
+  type EnvironmentOperationForbiddenReason,
   EnvironmentRequestInvalidError,
   type EnvironmentRequestInvalidReason,
   EnvironmentResourceNotFoundError,
@@ -26,7 +27,6 @@ import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { identity } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Cookies from "effect/http/Cookies";
 import * as HttpEffect from "effect/http/HttpEffect";
@@ -35,7 +35,12 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as SessionStore from "./SessionStore.ts";
-import { resolveTailscaleOwnerFromRequest } from "./TailscaleIdentityAuth.ts";
+import {
+  isTailscaleOwnerMode,
+  issueTailscaleOwnerAccessToken,
+  resolveTailscaleOwnerFromRequest,
+  TAILSCALE_USER_LOGIN_HEADER,
+} from "./TailscaleIdentityAuth.ts";
 import * as ServerConfig from "../config.ts";
 import { traceAuthenticatedRelayRequest, traceRelayRequest } from "../cloud/traceRelayRequest.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
@@ -137,7 +142,7 @@ export function failEnvironmentScopeRequired(requiredScope: AuthEnvironmentScope
   );
 }
 
-function failEnvironmentOperationForbidden(reason: "current_session_revoke_not_allowed") {
+function failEnvironmentOperationForbidden(reason: EnvironmentOperationForbiddenReason) {
   return currentEnvironmentTraceId.pipe(
     Effect.flatMap((traceId) =>
       Effect.fail(
@@ -201,6 +206,23 @@ export const failEnvironmentInternal =
     }
     return yield* new EnvironmentInternalError({ code: "internal_error", reason, traceId });
   });
+
+const verifyTokenRequestDpopProof = (request: HttpServerRequest.HttpServerRequest) =>
+  verifyRequestDpopProof({ request }).pipe(
+    Effect.catchIf(EnvironmentAuth.isServerAuthCredentialError, (error) =>
+      appendDpopChallengeHeader.pipe(
+        Effect.andThen(
+          failEnvironmentAuthInvalid(
+            "invalid_credential",
+            EnvironmentAuth.serverAuthDpopFailureReason(error),
+          ),
+        ),
+      ),
+    ),
+    Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
+      failEnvironmentInternal("access_token_issuance_failed", error),
+    ),
+  );
 
 const appendSessionCookie = (cookieName: string, token: string, expiresAt: DateTime.DateTime) =>
   Effect.fromResult(
@@ -330,6 +352,9 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.auth.browserSession")(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
+            if (isTailscaleOwnerMode(serverConfig)) {
+              return yield* failEnvironmentOperationForbidden("pairing_off");
+            }
             const request = yield* HttpServerRequest.HttpServerRequest;
             const previousCredential = EnvironmentAuth.selectRequestCredential(
               request,
@@ -385,6 +410,9 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.auth.token")(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
+            if (isTailscaleOwnerMode(serverConfig)) {
+              return yield* failEnvironmentOperationForbidden("pairing_off");
+            }
             const request = yield* HttpServerRequest.HttpServerRequest;
             const requestedScopes =
               args.payload.scope === undefined
@@ -394,21 +422,7 @@ export const layer = HttpApiBuilder.group(
               return yield* failEnvironmentInvalidRequest("invalid_scope");
             }
             const proofKeyThumbprint = args.headers.dpop
-              ? yield* verifyRequestDpopProof({ request }).pipe(
-                  Effect.catchIf(EnvironmentAuth.isServerAuthCredentialError, (error) =>
-                    appendDpopChallengeHeader.pipe(
-                      Effect.andThen(
-                        failEnvironmentAuthInvalid(
-                          "invalid_credential",
-                          EnvironmentAuth.serverAuthDpopFailureReason(error),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
-                    failEnvironmentInternal("access_token_issuance_failed", error),
-                  ),
-                )
+              ? yield* verifyTokenRequestDpopProof(request)
               : undefined;
             yield* appendCredentialResponseHeaders;
             return yield* serverAuth.exchangeBootstrapCredentialForAccessToken(
@@ -443,6 +457,43 @@ export const layer = HttpApiBuilder.group(
         ),
       )
       .handle(
+        "tailscaleToken",
+        Effect.fn("environment.auth.tailscaleToken")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const owner = resolveTailscaleOwnerFromRequest(serverConfig, request);
+          if (!owner) {
+            return yield* failEnvironmentAuthInvalid(
+              isTailscaleOwnerMode(serverConfig) &&
+                request.headers[TAILSCALE_USER_LOGIN_HEADER] !== undefined
+                ? "invalid_credential"
+                : "missing_credential",
+            );
+          }
+          const proofKeyThumbprint = args.headers.dpop
+            ? yield* verifyTokenRequestDpopProof(request)
+            : undefined;
+          yield* appendCredentialResponseHeaders;
+          return yield* issueTailscaleOwnerAccessToken({
+            owner,
+            client: deriveAuthClientMetadata({
+              request,
+              presented: {
+                ...(args.payload.client_label ? { label: args.payload.client_label } : {}),
+                ...(args.payload.client_device_type
+                  ? { deviceType: args.payload.client_device_type }
+                  : {}),
+                ...(args.payload.client_os ? { os: args.payload.client_os } : {}),
+              },
+            }),
+            proofKeyThumbprint,
+          }).pipe(
+            Effect.provideService(SessionStore.SessionStore, sessions),
+            Effect.catch((error) => failEnvironmentInternal("access_token_issuance_failed", error)),
+          );
+        }),
+      )
+      .handle(
         "webSocketTicket",
         Effect.fn("environment.auth.webSocketTicket")(
           function* (args) {
@@ -461,6 +512,9 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.auth.pairingCredential")(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
+            if (isTailscaleOwnerMode(serverConfig)) {
+              return yield* failEnvironmentOperationForbidden("pairing_off");
+            }
             const session = yield* requireEnvironmentScope(AuthAccessWriteScope);
             const delegatedScopes = args.payload.scopes ?? AuthStandardClientScopes;
             if (

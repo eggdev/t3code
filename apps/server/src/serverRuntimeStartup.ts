@@ -48,6 +48,7 @@ import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import { getServerOwners } from "./telemetry/Identify.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import { isTailscaleOwnerMode } from "./auth/TailscaleIdentityAuth.ts";
 import {
   formatHeadlessServeOutput,
   formatHostForUrl,
@@ -340,7 +341,7 @@ const resolveStartupBrowserTarget = Effect.gen(function* () {
       ? `http://${formatHostForUrl(serverConfig.host)}:${serverConfig.port}`
       : localUrl;
   const baseTarget = serverConfig.devUrl?.toString() ?? bindUrl;
-  return serverConfig.mode === "desktop" || serverConfig.tailscaleOwnerLogin !== undefined
+  return serverConfig.mode === "desktop" || isTailscaleOwnerMode(serverConfig)
     ? baseTarget
     : yield* serverAuth.issueStartupPairingUrl(baseTarget);
 });
@@ -621,7 +622,11 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
           }),
           Effect.ignoreCause({ log: true }),
         );
-        if (serverConfig.startupPresentation === "headless") {
+        if (serverConfig.startupPresentation === "headless" && isTailscaleOwnerMode(serverConfig)) {
+          yield* Effect.logInfo("Signing in with Tailscale identity. Pairing is off.", {
+            owner: serverConfig.tailscaleOwnerLogin,
+          });
+        } else if (serverConfig.startupPresentation === "headless") {
           yield* Effect.logDebug("startup phase: headless access info");
           const accessInfo = yield* issueHeadlessServeAccessInfo();
           yield* runStartupPhase(
@@ -631,8 +636,8 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
         } else {
           yield* Effect.logDebug("startup phase: browser open check");
           const startupBrowserTarget = yield* resolveStartupBrowserTarget;
-          if (serverConfig.tailscaleOwnerLogin !== undefined) {
-            yield* Effect.logInfo("Signing in with Tailscale identity. No pairing URL.", {
+          if (isTailscaleOwnerMode(serverConfig)) {
+            yield* Effect.logInfo("Signing in with Tailscale identity. Pairing is off.", {
               owner: serverConfig.tailscaleOwnerLogin,
             });
           } else if (serverConfig.mode !== "desktop") {

@@ -243,7 +243,7 @@ export function ConnectionsNewRouteScreen({
               <View className="ml-4 border-t border-border-subtle" />
               <PairingInputRow
                 label="Code"
-                placeholder="Pairing code"
+                placeholder="Optional with Tailscale"
                 returnKeyType="go"
                 value={codeInput}
                 onChangeText={handleCodeChange}

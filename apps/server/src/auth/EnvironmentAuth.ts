@@ -42,6 +42,7 @@ import * as PairingGrantStore from "./PairingGrantStore.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
 import * as SessionStore from "./SessionStore.ts";
 import { REUSABLE_DEV_SESSION_EXPIRES_AT, resolveReusableDevAuth } from "./ReusableDevAuth.ts";
+import { isPairingOffError } from "./TailscaleIdentityAuth.ts";
 import { verifyRequestDpopProof } from "./dpop.ts";
 import { DESKTOP_RENDERER_ORIGINS } from "../httpCors.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -161,7 +162,7 @@ export class ServerAuthPairingLinkCreationError extends Schema.TaggedError<Serve
   },
 ) {
   override get message(): string {
-    return "Failed to create pairing link.";
+    return isPairingOffError(this.cause) ? this.cause.message : "Failed to create pairing link.";
   }
 }
 

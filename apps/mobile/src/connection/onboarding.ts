@@ -6,6 +6,7 @@ import {
 import type { EnvironmentId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
+import { readOwnerSignInAddress } from "../features/connection/ownerSignIn";
 import { connectionAtomRuntime } from "./runtime";
 
 const onboardingScheduler = createAtomCommandScheduler();
@@ -25,7 +26,17 @@ export const connectPairingUrl = createRuntimeCommand(connectionAtomRuntime, {
     readonly expectedEnvironmentId?: EnvironmentId;
   }) =>
     ConnectionOnboarding.ConnectionOnboarding.pipe(
-      Effect.flatMap((onboarding) => onboarding.registerPairing(input)),
+      Effect.flatMap((onboarding) => {
+        const ownerAddress = readOwnerSignInAddress(input.pairingUrl);
+        return ownerAddress === null
+          ? onboarding.registerPairing(input)
+          : onboarding.registerTailscaleOwner({
+              address: ownerAddress,
+              ...(input.expectedEnvironmentId === undefined
+                ? {}
+                : { expectedEnvironmentId: input.expectedEnvironmentId }),
+            });
+      }),
     ),
 });
 

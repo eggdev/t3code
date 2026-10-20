@@ -27,7 +27,7 @@ export type RemoteEnvironmentAuthError = RemoteEnvironmentRequestError;
 
 const DEFAULT_REMOTE_REQUEST_TIMEOUT_MS = 10_000;
 
-const clientMetadataTokenExchangeFields = (
+export const clientMetadataTokenExchangeFields = (
   clientMetadata: AuthClientPresentationMetadata | undefined,
 ) => {
   const displayOs = clientMetadata?.os;

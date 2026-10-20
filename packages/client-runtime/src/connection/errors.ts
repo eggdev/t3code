@@ -200,7 +200,10 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentOperationForbiddenError":
       return new ConnectionBlockedError({
         reason: "permission",
-        detail: "The environment credential does not grant the required access.",
+        detail:
+          error._tag === "EnvironmentOperationForbiddenError" && error.reason === "pairing_off"
+            ? error.message
+            : "The environment credential does not grant the required access.",
         traceId: error.traceId,
         hop: "server",
         via,
