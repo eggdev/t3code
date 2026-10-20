@@ -39,5 +39,6 @@ names one sandbox host.
 
 - [Model gateway](./model-gateway.md)
 - [Journey: ticket run](./journey-ticket-run.md)
-- `linear-agent/docs/development.md`, `linear-agent/src/egress.mjs` and
-  `linear-agent/docs/mobile.md`
+- `clyde/sandbox/` for the sandbox image, `clyde-sandbox-exec` and the host's
+  compose file
+- `packages/clyde-sandbox-host/src/egressProxy.ts`

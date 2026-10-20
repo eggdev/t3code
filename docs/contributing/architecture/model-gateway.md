@@ -27,13 +27,23 @@ holds them.
 - No code assumes that a model is hosted. A step names its provider, so a
   local model can later fill one ([project intent](../project-intent.md)).
 
-## Open before the first ticket run
+## Where it runs
 
-`linear-agent` ran Codex through a subscription gateway live. It never ran
-Claude live. The first Claude ticket run proves that the gateway can add the
-Claude subscription credential for a Claude Code sandbox.
+The gateway and the egress proxy are `packages/clyde-sandbox-host`, run by
+`clyde/sandbox/compose.yml` on each Linux sandbox host. Sandboxes reach them
+on the internal `clyde-sandbox` network as `model-gateway:8080` and
+`public-egress:8083`.
+
+| Provider | How a sandbox calls it                                                           | What the gateway adds                                                     |
+| -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Codex    | `model_provider="gateway"`, set by `clyde-sandbox-exec`                          | The ChatGPT login, refreshed through Codex itself                         |
+| Claude   | `ANTHROPIC_BASE_URL=http://model-gateway:8080/anthropic` and a placeholder token | The subscription token from `claude setup-token`, and the OAuth beta flag |
+
+The logins live in `~/.config/clyde/auth` on the host, mode 0700, until the
+1Password service account holds them
+([secret rotation](../operations/secret-rotation.md)).
 
 ## What to read when changing it
 
-- `linear-agent/src/gateway.mjs` and `linear-agent/src/subscription.mjs`
+- `packages/clyde-sandbox-host/src/modelGateway.ts` and `codexSubscription.ts`
 - [Journey: ticket run](./journey-ticket-run.md)
