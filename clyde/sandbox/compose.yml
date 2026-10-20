@@ -1,0 +1,48 @@
+# The services every sandbox on this host reaches. Sandboxes join the
+# internal `clyde-sandbox` network, which has no route out. Only the gateway
+# and the egress proxy also join `clyde-egress`, which does.
+# The gateway's logins live in ~/.config/clyde/auth on the host, mode 0700.
+name: clyde-sandbox-host
+services:
+  egress:
+    build: { context: ., dockerfile: Host.Dockerfile }
+    image: clyde-sandbox-host:latest
+    command: [node, src/main.ts, egress]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 1g
+    networks:
+      sandbox: { aliases: [public-egress] }
+      egress: {}
+  gateway:
+    image: clyde-sandbox-host:latest
+    command: [node, src/main.ts, gateway]
+    restart: unless-stopped
+    environment:
+      CODEX_HOME: /auth/codex
+      HOME: /auth/codex
+      CLAUDE_TOKEN_FILE: /auth/claude/oauth-token
+    volumes:
+      - ${HOME}/.config/clyde/auth:/auth
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+    depends_on: [egress]
+    networks:
+      sandbox: { aliases: [model-gateway] }
+      egress: {}
+networks:
+  sandbox:
+    name: clyde-sandbox
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+  egress:
+    name: clyde-egress

@@ -17,7 +17,7 @@ import sys
 WORKTREE_ROOT = "/opt/clyde/worktrees"
 HOME_ROOT = os.path.expanduser("~/.local/share/clyde/homes")
 IMAGE = os.environ.get("CLYDE_SANDBOX_IMAGE", "clyde-sandbox:latest")
-NETWORK = os.environ.get("CLYDE_SANDBOX_NETWORK", "linear-spark-sandbox")
+NETWORK = os.environ.get("CLYDE_SANDBOX_NETWORK", "clyde-sandbox")
 GATEWAY = "http://model-gateway:8080"
 EGRESS = "http://public-egress:8083"
 ALLOWED = {"codex", "claude"}
