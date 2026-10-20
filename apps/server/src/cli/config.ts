@@ -167,6 +167,14 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  sandboxSshTarget: Config.String("T3CODE_SANDBOX_SSH_TARGET").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  sandboxSshKeyPath: Config.String("T3CODE_SANDBOX_SSH_KEY").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
 });
 
 const DevAuthTokenConfig = Config.Redacted("T3CODE_DEV_AUTH_TOKEN").pipe(
@@ -473,6 +481,8 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     ...(env.tailscaleOwnerLogin === undefined
       ? {}
       : { tailscaleOwnerLogin: env.tailscaleOwnerLogin }),
+    ...(env.sandboxSshTarget === undefined ? {} : { sandboxSshTarget: env.sandboxSshTarget }),
+    ...(env.sandboxSshKeyPath === undefined ? {} : { sandboxSshKeyPath: env.sandboxSshKeyPath }),
     devAllowedOrigins: env.devAllowedOrigins,
     noBrowser,
     startupPresentation,

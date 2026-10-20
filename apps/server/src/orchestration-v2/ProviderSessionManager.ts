@@ -41,6 +41,8 @@ import {
   withMetrics,
 } from "../observability/Metrics.ts";
 import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
+import * as ServerConfig from "../config.ts";
+import { sandboxSessionRefusal, sandboxSshOf } from "../process/sandboxCommand.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
@@ -329,6 +331,9 @@ export const layerWithOptions = (
       const providerEventIngestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
       const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
       const agentScope = yield* AgentScope;
+      const sandbox = sandboxSshOf(
+        Option.getOrUndefined(yield* Effect.serviceOption(ServerConfig.ServerConfig)),
+      );
       const agentAccessSettings = Effect.fn("ProviderSessionManagerV2.agentAccessSettings")(
         function* (threadId: ThreadId) {
           if (Option.isNone(serverSettings)) return { browser: true, device: false };
@@ -436,7 +441,10 @@ export const layerWithOptions = (
         threadId: ThreadId,
         providerInstanceId: ProviderInstanceId,
       ): Effect.Effect<PreparedMcpCredential> =>
-        options.configureMcp === false
+        // Clyde: an agent in a sandbox cannot reach the server's loopback MCP
+        // endpoint, and no token goes into a sandbox. The relay comes later:
+        // docs/contributing/architecture/mcp.md.
+        options.configureMcp === false || sandbox !== undefined
           ? mcpSessions
               .clear(threadId)
               .pipe(Effect.as<PreparedMcpCredential>({ mcpCredentialId: undefined, issued: false }))
@@ -2148,6 +2156,17 @@ export const layerWithOptions = (
                     }),
                 ),
               );
+              const sandboxRefusal = sandboxSessionRefusal(sandbox, {
+                driver: adapter.driver,
+                cwd: input.runtimePolicy.cwd,
+              });
+              if (sandboxRefusal !== undefined) {
+                return yield* new ProviderSessionOpenError({
+                  instanceId: input.modelSelection.instanceId,
+                  providerSessionId: input.providerSessionId,
+                  cause: sandboxRefusal,
+                });
+              }
               const prepared = yield* prepareMcpSession(
                 input.threadId,
                 input.modelSelection.instanceId,

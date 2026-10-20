@@ -86,6 +86,9 @@ export class ServerConfig extends Context.Service<
     readonly tailscaleServeEnabled: boolean;
     readonly tailscaleServePort: number;
     readonly tailscaleOwnerLogin?: string | undefined;
+    /** Clyde: agents run on this SSH target (`user@host`) when it is set. */
+    readonly sandboxSshTarget?: string | undefined;
+    readonly sandboxSshKeyPath?: string | undefined;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (

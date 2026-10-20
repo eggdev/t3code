@@ -1393,12 +1393,14 @@ export const makeCodexAppServerSpawnCommand = Effect.fn(
   readonly env?: NodeJS.ProcessEnv | undefined;
   readonly extendEnv?: boolean | undefined;
   readonly threadId?: string | undefined;
+  readonly agentCwd?: string | undefined;
 }) {
   const launch = yield* (yield* AgentScope).wrap({
     command: input.command,
     args: input.args,
     name: "codex",
     threadId: input.threadId,
+    cwd: input.agentCwd,
     env: input.env,
     shared: true,
   });
@@ -1554,6 +1556,7 @@ export const layerAppServerClientFactory: Layer.Layer<
           ),
           env: environment,
           threadId: input.threadId,
+          agentCwd: input.runtimePolicy.cwd ?? undefined,
         }).pipe(Effect.provideService(AgentScope, agentScope));
         const handle = yield* spawner.spawn(command).pipe(
           Effect.provideService(Scope.Scope, scope),

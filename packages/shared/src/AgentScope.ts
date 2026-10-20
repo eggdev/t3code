@@ -8,6 +8,8 @@ export interface AgentScopeShape {
     readonly name: string;
     readonly threadId?: string | undefined;
     readonly env?: NodeJS.ProcessEnv | undefined;
+    /** The agent's working folder, for a wrapper that runs it on another machine. */
+    readonly cwd?: string | undefined;
     /**
      * Set for terminals, so a job the user detached (tmux, nohup) outlives a
      * server restart. Agents leave it unset: the next server stops agents a
