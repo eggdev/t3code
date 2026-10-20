@@ -1,3 +1,13 @@
+# Clyde
+
+This repository is Clyde, a tracking fork of T3 Code for one owner. Clyde
+turns Linear tickets and chats into pull requests that pass each project's
+gates. Read [project intent](./docs/contributing/project-intent.md) before a
+product decision, and the [contributor docs](./docs/contributing/index.md) for
+architecture, decisions and operations. Clyde's rules win where they differ
+from the T3 Code text below. Keep changes to upstream files small
+([0001](./docs/contributing/decisions/0001-tracking-fork-of-t3-code.md)).
+
 # T3 Code
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity) and serves web, desktop, and mobile clients.

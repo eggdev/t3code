@@ -1,0 +1,32 @@
+# The primitives registry: one list of the parts of Clyde.
+#
+# Each primitive names the folders it owns (`code`), the pages that explain it
+# (`docs`) and, for a service, the vendors that only it imports (`vendors`).
+# Product primitives join as their code folders land. See
+# docs/contributing/architecture/index.md#modules.
+
+version: 1
+
+groups: []
+
+primitives: []
+
+layers: []
+
+invariants:
+  - id: gates-guard-every-pull-request
+    summary: Each pull request has a passing result for every gate of its project's workflow, on its head commit.
+    docs:
+      - docs/contributing/project-intent.md#hard-invariants
+  - id: only-the-owner
+    summary: Only the owner starts or steers work, through Linear or a client with the owner's Tailscale identity.
+    docs:
+      - docs/contributing/project-intent.md#hard-invariants
+  - id: sandbox-holds-no-credentials
+    summary: A sandbox never holds Clyde's credentials, and it never changes the default branch.
+    docs:
+      - docs/contributing/project-intent.md#hard-invariants
+  - id: no-lost-prompt
+    summary: Clyde stores each Linear event and client message before it acknowledges it.
+    docs:
+      - docs/contributing/project-intent.md#hard-invariants
