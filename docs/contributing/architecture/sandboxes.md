@@ -29,6 +29,9 @@ names one sandbox host.
   fresh checkout.
 - Adding a project builds its sandbox image on its host at once. A chat or a
   ticket run never waits for a first setup.
+- A thread's worktree is the same files at the same path on the server and in
+  its sandbox, through a mount
+  ([0010](../decisions/0010-agents-driven-from-the-server.md)).
 - A Clyde worker runs on each host. The Spark worker serves Linux projects.
   A second worker on the Mac mini drives the Tart VMs for iOS projects.
 

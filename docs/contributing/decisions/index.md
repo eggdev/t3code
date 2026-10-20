@@ -72,6 +72,8 @@ A record amended more than once lists each amending record:
   setup replace the template's.
 - [0009](./0009-every-agent-in-a-sandbox.md): no agent process on the Mac
   mini; chats run in sandboxes like ticket runs.
+- [0010](./0010-agents-driven-from-the-server.md): the server drives agents;
+  only the agent CLI runs in the sandbox, and runs pause during an outage.
 
 ## Historical
 

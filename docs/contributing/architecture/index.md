@@ -7,16 +7,16 @@ surface or storage home.
 
 ## Runtime map
 
-| Unit                    | Public surface                                            | Owns                                                                           | Binds                                                         |
-| ----------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Clyde server (Mac mini) | Tailscale HTTPS for the apps; the Linear webhook route    | Threads, projects, Linear, the `gh` push. It runs no agent process             | Event store, log files, 1Password, Linear, GitHub, the worker |
-| Clyde worker (Spark)    | None. It connects outbound to the server over the tailnet | Chats and ticket runs: the workflow engine, agent sandboxes and gate sandboxes | Worker log, model gateway, Docker, the server                 |
-| Clyde worker (Mac mini) | None. It connects to the server on the same machine       | iOS chats and ticket runs in Tart macOS VMs                                    | Tart, Worker log, the server                                  |
-| Model gateway (Spark)   | The sandboxes' internal network only                      | Model keys; adds them to each model call                                       | 1Password, hosted model APIs                                  |
-| Desktop app and iOS app | None                                                      | The owner's view and input                                                     | The server                                                    |
-| Event store (SQLite)    | None                                                      | The server's state, in T3 Code's event shape plus Clyde's tables               | Litestream to R2                                              |
-| Worker log (SQLite)     | None                                                      | Each run's events until the server confirms them                               | None                                                          |
-| Log files               | None                                                      | Full agent and gate logs                                                       | restic to R2                                                  |
+| Unit                    | Public surface                                            | Owns                                                                                                              | Binds                                                         |
+| ----------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Clyde server (Mac mini) | Tailscale HTTPS for the apps; the Linear webhook route    | Threads, projects, Linear, the `gh` push, the workflow engine and the provider adapters. It runs no agent process | Event store, log files, 1Password, Linear, GitHub, the worker |
+| Clyde worker (Spark)    | None. It connects outbound to the server over the tailnet | Agent and gate sandboxes, and the relay for each agent process's input and output                                 | Worker log, model gateway, Docker, the server                 |
+| Clyde worker (Mac mini) | None. It connects to the server on the same machine       | iOS chats and ticket runs in Tart macOS VMs                                                                       | Tart, Worker log, the server                                  |
+| Model gateway (Spark)   | The sandboxes' internal network only                      | Model keys; adds them to each model call                                                                          | 1Password, hosted model APIs                                  |
+| Desktop app and iOS app | None                                                      | The owner's view and input                                                                                        | The server                                                    |
+| Event store (SQLite)    | None                                                      | The server's state, in T3 Code's event shape plus Clyde's tables                                                  | Litestream to R2                                              |
+| Worker log (SQLite)     | None                                                      | Each run's events until the server confirms them                                                                  | None                                                          |
+| Log files               | None                                                      | Full agent and gate logs                                                                                          | restic to R2                                                  |
 
 ## Modules
 
@@ -26,9 +26,9 @@ owns, its docs and, for a service, its vendors. The registry never records depen
 them.
 
 Clyde is the T3 Code server with Clyde's own modules for Linear, workflows,
-gates and sandboxes. The Spark worker is a headless run engine built from T3
-Code's provider packages, and it streams each ticket run into a T3 Code thread
-on the server. The product primitives join the registry as their code folders land in this
+gates and sandboxes. The server drives every agent with T3 Code's own provider
+adapters. Only the agent's CLI process runs in a sandbox, started through the
+worker on the sandbox host ([0010](../decisions/0010-agents-driven-from-the-server.md)). The product primitives join the registry as their code folders land in this
 fork.
 
 Services are molecules: focused and the same everywhere. Domains are organisms:
@@ -110,7 +110,7 @@ These are T3 Code's entry points. Clyde's own modules join them in the fork.
   workflow lives, and which version checks a workflow change
 
 - [Journey: recovery](./journey-recovery.md): restarts, sleep and lost
-  networks, and how runs continue without the Mac mini
+  networks, and what waits while the Mac mini is away
 
 - [Linear](./linear.md): the OAuth app, the events, the team-to-project map
   and the status rules

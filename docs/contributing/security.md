@@ -86,7 +86,11 @@ queries, logging or deploy configuration.
     [Linear](./architecture/linear.md).
 24. **A workflow change passes the default branch's gates.** See
     [journey: edit a project's workflow](./architecture/journey-edit-workflow.md).
-25. **Clyde has no tenant key.** Data is separated by Clyde project and Linear
+25. **Server git calls never run code from a worktree.** Every git call on
+    the server pins `core.hooksPath`, `core.fsmonitor` and the other
+    command-running options to safe values, because agents write those files
+    ([0010](./decisions/0010-agents-driven-from-the-server.md)).
+26. **Clyde has no tenant key.** Data is separated by Clyde project and Linear
     workspace ([0003](./decisions/0003-no-tenant-model.md)).
 
 When a rule can be a check, add the check. See

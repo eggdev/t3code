@@ -3,13 +3,13 @@
 Clyde loses no accepted prompt and no work when a machine restarts, sleeps or
 drops off the network.
 
-| Question                                              | Answer                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Can the Mac mini sleep?                               | No. The install sets `pmset` to stay awake and to restart after a power loss.           |
-| What happens when the Mac mini restarts?              | Clyde replays its event log and reconnects to each live run and chat session.           |
-| What about Linear events missed while it was down?    | At start, Clyde asks Linear for each agent session and delegated issue it has not seen. |
-| Do ticket runs stop when the Mac mini is unreachable? | No. They keep working on the Spark, and the worker stores their events on its own disk. |
-| What happens when the Spark restarts?                 | The worker resumes each run from its last committed step.                               |
+| Question                                           | Answer                                                                                                                                                                                                        |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can the Mac mini sleep?                            | No. The install sets `pmset` to stay awake and to restart after a power loss.                                                                                                                                 |
+| What happens when the Mac mini restarts?           | Clyde replays its event log and reconnects to each live run and chat session.                                                                                                                                 |
+| What about Linear events missed while it was down? | At start, Clyde asks Linear for each agent session and delegated issue it has not seen.                                                                                                                       |
+| Do runs stop when the Mac mini is unreachable?     | The agent's current turn keeps running in its sandbox, and the worker buffers its output. No new turn or step starts until the Mac mini returns ([0010](../decisions/0010-agents-driven-from-the-server.md)). |
+| What happens when the Spark restarts?              | The worker resumes each run from its last committed step.                                                                                                                                                     |
 
 ## Rules
 
@@ -17,12 +17,12 @@ drops off the network.
   acknowledges it ([invariant 4](../project-intent.md#hard-invariants)).
 - Clyde does not depend on Linear to retry a webhook. The start-up check finds
   any event it missed.
-- The Spark worker keeps an ordered log of each run's events and gate results
-  on its own disk. It deletes an entry only after the Mac mini confirms it.
-- A ticket run needs the Mac mini only to open a pull request and to update
-  Linear. Every other step runs on the sandbox host alone.
-- A chat session's agent runs in a sandbox, like a ticket run's. After a
-  restart, the worker resumes it in the same way.
+- The worker keeps each agent process's output in order on its own disk while
+  the server is away. It deletes an entry only after the server confirms it.
+- The server drives every turn and every workflow step. While it is away, a
+  running turn finishes in its sandbox, and the next step waits.
+- After a restart, the server reattaches to each live agent process through
+  the worker and reads the buffered output.
 
 ## The walk
 
@@ -30,8 +30,8 @@ drops off the network.
 2. **Replay.** Clyde replays its event log and rebuilds its state.
 3. **Catch up with Linear.** Clyde lists the agent sessions and delegated
    issues it has not seen, and starts or resumes those runs.
-4. **Catch up with the Spark.** The worker delivers the events it stored, in
-   order. Runs that reached their gates open their pull requests.
+4. **Catch up with the sandboxes.** The worker delivers each agent's buffered
+   output, in order. Waiting runs start their next step.
 5. **Clients reconnect.** Each app reconnects over the tailnet and shows the
    live state.
 
