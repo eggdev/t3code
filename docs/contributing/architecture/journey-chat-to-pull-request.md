@@ -5,7 +5,7 @@ same gates that guard a ticket run decide whether it becomes a pull request.
 
 | Question                                | Answer                                                                        |
 | --------------------------------------- | ----------------------------------------------------------------------------- |
-| Where does the chat's agent work?       | In a new Git worktree on the Mac mini, on the branch `clyde/chat-<id>`.       |
+| Where does the chat's agent work?       | In a sandbox on the project's sandbox host, on the branch `clyde/chat-<id>`.  |
 | Who starts the pull request?            | The owner, with **Open pull request** or by asking the agent.                 |
 | Where do the gates run?                 | In a fresh sandbox on the project's sandbox host, from the exact head commit. |
 | Which gates run?                        | The gates of the project's workflow. The default is `validate`, then review.  |
@@ -13,8 +13,8 @@ same gates that guard a ticket run decide whether it becomes a pull request.
 
 ## Rules
 
-- A gate never runs in the chat's worktree. A pass there does not prove the
-  commit, because the worktree can hold files that were never committed.
+- A gate never runs in the chat's sandbox. A pass there does not prove the
+  commit, because the sandbox can hold files that were never committed.
 - Each gate result names the commit SHA it checked. A new commit makes the
   earlier results stale, and the gates run again from the start.
 - The review gate is a separate agent with a fresh context. It sees the diff
@@ -24,9 +24,9 @@ same gates that guard a ticket run decide whether it becomes a pull request.
 ## The walk
 
 1. **Start.** The owner picks a project and starts a chat. Clyde makes a
-   worktree and a branch for it.
+   sandbox and a branch for it on the project's sandbox host.
 2. **Work.** The owner and the agent work in the thread. The agent edits
-   files, runs commands and commits in the worktree.
+   files, runs commands and commits in the sandbox.
 3. **Ask for a pull request.** Clyde hands the head commit to the project's
    workflow, at its first gate.
 4. **Gates.** Each gate runs in a fresh sandbox. Its result and log appear in
@@ -38,13 +38,13 @@ same gates that guard a ticket run decide whether it becomes a pull request.
 
 ## Empty, error and offline states
 
-| State                             | What the owner sees                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| A gate fails                      | The gate, its command and the tail of its log, with a link to the full log.                |
-| Review asks for changes           | The review's findings in the thread. The owner and the agent work on them.                 |
-| The sandbox host is offline       | "Sandbox host offline". The gates wait and start when the host returns.                    |
-| The worktree has uncommitted work | **Open pull request** lists the uncommitted files and asks the agent to commit them first. |
-| Push or PR creation fails         | The error from GitHub. The gate results stay valid for that commit, so a retry skips them. |
+| State                            | What the owner sees                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| A gate fails                     | The gate, its command and the tail of its log, with a link to the full log.                |
+| Review asks for changes          | The review's findings in the thread. The owner and the agent work on them.                 |
+| The sandbox host is offline      | "Sandbox host offline". The gates wait and start when the host returns.                    |
+| The sandbox has uncommitted work | **Open pull request** lists the uncommitted files and asks the agent to commit them first. |
+| Push or PR creation fails        | The error from GitHub. The gate results stay valid for that commit, so a retry skips them. |
 
 ## What to read when changing it
 

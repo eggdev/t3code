@@ -42,7 +42,7 @@ This page applies [one door for each decision](../../principles/one-door-for-eac
 | Desktop app, iOS app           | Tailscale HTTPS (Tailscale Serve), WebSocket RPC                        | The owner                             | Tailscale Serve's identity header is the owner's login                                             |
 | Linear webhook                 | The public internet, through Tailscale Funnel on `/linear/webhook` only | The owner, as the session's requester | HMAC over the raw body, 60-second freshness, workspace and app IDs, and the requester is the owner |
 | Clyde worker (Spark, Mac mini) | The tailnet, on a worker-only port                                      | None                                  | A Tailscale ACL that admits only the worker hosts, and a per-worker token from 1Password           |
-| Chat agents, through MCP       | Loopback on the Mac mini                                                | Inherited from the thread             | T3 Code's MCP OAuth. Sandboxes cannot reach it                                                     |
+| Agents, through MCP            | The worker relay on the sandbox host                                    | Inherited from the thread             | The relay maps each sandbox to its thread. No sandbox reaches the server directly                  |
 
 Funnel exposes one path. The apps' address stays on the tailnet. Tailscale
 Serve sends identity headers only for devices that a user owns, so a worker,

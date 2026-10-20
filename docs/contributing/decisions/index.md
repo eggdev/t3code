@@ -70,6 +70,8 @@ A record amended more than once lists each amending record:
 
 - [0008](./0008-no-nx-in-the-fork.md): no Nx remote cache; T3 Code's CI and
   setup replace the template's.
+- [0009](./0009-every-agent-in-a-sandbox.md): no agent process on the Mac
+  mini; chats run in sandboxes like ticket runs.
 
 ## Historical
 

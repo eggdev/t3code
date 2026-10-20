@@ -21,8 +21,8 @@ drops off the network.
   on its own disk. It deletes an entry only after the Mac mini confirms it.
 - A ticket run needs the Mac mini only to open a pull request and to update
   Linear. Every other step runs on the sandbox host alone.
-- A chat session's agent runs on the Mac mini. After a restart, its agent
-  process starts again and resumes the thread.
+- A chat session's agent runs in a sandbox, like a ticket run's. After a
+  restart, the worker resumes it in the same way.
 
 ## The walk
 

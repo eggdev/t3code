@@ -59,9 +59,12 @@ queries, logging or deploy configuration.
     content.** Production data questions run as reviewed query workflows. See
     [production access](./operations/production-access.md).
 
-17. **The server listens on loopback only, behind Tailscale Serve.** Clyde
-    trusts Tailscale Serve's identity headers only because nothing else can
-    reach the port. A test asserts the bind address.
+17. **The server listens on loopback only, behind Tailscale Serve, and the
+    Mac mini runs no agent process.** Clyde trusts Tailscale Serve's identity
+    headers only because no other process can reach the port and send them.
+    A test asserts the bind address. Tart VMs reach the host through its VM
+    network, never its loopback
+    ([0009](./decisions/0009-every-agent-in-a-sandbox.md)).
 18. **The owner's Tailscale login is the only accepted identity.** T3 Code's
     pairing links are off. See
     [request context](./architecture/request-context.md).

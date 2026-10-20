@@ -6,7 +6,8 @@ the Clyde desktop app and the Clyde iOS app, and works in two modes, side by
 side:
 
 - **Chat sessions.** The owner talks with an agent about a configured project,
-  as in T3 Code. Each session runs in its own working directory.
+  as in T3 Code. Each session runs in its own sandbox on the project's
+  sandbox host.
 - **Ticket runs.** The owner assigns a Linear ticket to Clyde. Clyde runs it
   through the project's workflow in a sandbox on the DGX Spark or a remote
   host. The owner can chat with a ticket run from Linear or from the apps.
@@ -121,11 +122,13 @@ touches them as a one-way door
 2. **Only the owner starts or steers work.** Clyde refuses a Linear agent
    session from any other workspace member. The clients connect only from a
    device on the owner's tailnet that carries the owner's Tailscale identity.
-3. **A sandbox never holds Clyde's credentials, and it never changes the
-   default branch.** Linear OAuth tokens, model keys and GitHub tokens stay
-   outside the sandbox. The agent commits inside the sandbox. A trusted process
-   outside it takes the commits and pushes them to the run's branch. No agent
-   pushes to the default branch, force-pushes, merges or deletes a branch.
+3. **Every agent runs in a sandbox, and a sandbox never holds Clyde's
+   credentials or changes the default branch.** Chat sessions and ticket runs
+   both run their agents in sandboxes, so the Mac mini runs no agent process.
+   Linear OAuth tokens, model credentials and the `gh` token stay outside the
+   sandbox. The agent commits inside the sandbox. A trusted process outside it
+   takes the commits and pushes them to the run's branch. No agent pushes to
+   the default branch, force-pushes, merges or deletes a branch.
 4. **Clyde never loses an accepted prompt.** Clyde stores each Linear event
    and each client message before it acknowledges it. A run continues after a
    restart, a sleep or a lost connection.

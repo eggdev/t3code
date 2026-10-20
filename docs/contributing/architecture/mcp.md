@@ -13,13 +13,12 @@ first-class users, so each tool gets the same care as a screen.
 | How does a tool that changes data act? | It follows the [rules for agents](../../users/agents.md)                |
 | How much does a list return?           | A slim index with a limit and a cursor. Details come from a second call |
 
-Clyde has two MCP doors. Chat agents on the Mac mini use T3 Code's MCP server
-(`apps/server/src/mcp/`), over loopback, with T3 Code's MCP OAuth. Ticket-run
-agents in a sandbox use the worker's relay, over the sandbox's internal
-network. The relay knows which run each sandbox serves, adds the Linear
-credential on the server side, and never hands a token to the sandbox. Clyde's
-tools live in Clyde's own toolkit in both doors, and both call the same domain
-commands.
+Every agent runs in a sandbox
+([0009](../decisions/0009-every-agent-in-a-sandbox.md)), so every agent reaches
+Clyde's tools through the worker's relay, over the sandbox's internal network.
+The relay knows which thread each sandbox serves, adds the Linear credential
+on the server side, and never hands a token to the sandbox. T3 Code's
+Orchestrator tools reach sandboxed agents through the same relay.
 
 ## Rules
 
@@ -118,7 +117,7 @@ and a registration file in one folder.
 
 | Capability                      | Who gets it                       | Tools                                                                                              | Changes data                           |
 | ------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| T3 Code Orchestrator (upstream) | Chat agents                       | As upstream ships them                                                                             | Yes                                    |
+| T3 Code Orchestrator (upstream) | Chat agents, through the relay    | As upstream ships them                                                                             | Yes                                    |
 | Linear                          | Chat agents and ticket-run agents | Read the issue, its comments and its project. Comment. Create a sub-issue. Update the description. | Yes. No delete tool and no status tool |
 | Run                             | Ticket-run agents                 | Report the step's outcome (continue, review or blocked) with a milestone plan. Ask the owner.      | Yes, on the agent's own run only       |
 

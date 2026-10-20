@@ -1,6 +1,7 @@
 # Sandboxes
 
-Every ticket-run step and every gate runs in its own sandbox. Each project
+Every chat session, every ticket-run step and every gate runs in its own
+sandbox ([0009](../decisions/0009-every-agent-in-a-sandbox.md)). Each project
 names one sandbox host.
 
 | Host                        | Runs                                                    | Isolation        | Projects              |
@@ -23,6 +24,8 @@ names one sandbox host.
 - An iOS sandbox is a Tart VM, never a macOS user account. A user account
   cannot keep an agent away from the Mac mini's Keychain, the push process and
   the Clyde server.
+- Adding a project builds its sandbox image on its host at once. A chat or a
+  ticket run never waits for a first setup.
 - A Clyde worker runs on each host. The Spark worker serves Linux projects.
   A second worker on the Mac mini drives the Tart VMs for iOS projects.
 

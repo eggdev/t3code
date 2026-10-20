@@ -7,16 +7,16 @@ surface or storage home.
 
 ## Runtime map
 
-| Unit                    | Public surface                                            | Owns                                                                     | Binds                                                         |
-| ----------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Clyde server (Mac mini) | Tailscale HTTPS for the apps; the Linear webhook route    | Threads, chat sessions and their agents, projects, Linear, the `gh` push | Event store, log files, 1Password, Linear, GitHub, the worker |
-| Clyde worker (Spark)    | None. It connects outbound to the server over the tailnet | Ticket runs: the workflow engine, agent sandboxes and gate sandboxes     | Worker log, model gateway, Docker, the server                 |
-| Clyde worker (Mac mini) | None. It connects to the server on the same machine       | iOS ticket runs in Tart macOS VMs                                        | Tart, Worker log, the server                                  |
-| Model gateway (Spark)   | The sandboxes' internal network only                      | Model keys; adds them to each model call                                 | 1Password, hosted model APIs                                  |
-| Desktop app and iOS app | None                                                      | The owner's view and input                                               | The server                                                    |
-| Event store (SQLite)    | None                                                      | The server's state, in T3 Code's event shape plus Clyde's tables         | Litestream to R2                                              |
-| Worker log (SQLite)     | None                                                      | Each run's events until the server confirms them                         | None                                                          |
-| Log files               | None                                                      | Full agent and gate logs                                                 | restic to R2                                                  |
+| Unit                    | Public surface                                            | Owns                                                                           | Binds                                                         |
+| ----------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Clyde server (Mac mini) | Tailscale HTTPS for the apps; the Linear webhook route    | Threads, projects, Linear, the `gh` push. It runs no agent process             | Event store, log files, 1Password, Linear, GitHub, the worker |
+| Clyde worker (Spark)    | None. It connects outbound to the server over the tailnet | Chats and ticket runs: the workflow engine, agent sandboxes and gate sandboxes | Worker log, model gateway, Docker, the server                 |
+| Clyde worker (Mac mini) | None. It connects to the server on the same machine       | iOS chats and ticket runs in Tart macOS VMs                                    | Tart, Worker log, the server                                  |
+| Model gateway (Spark)   | The sandboxes' internal network only                      | Model keys; adds them to each model call                                       | 1Password, hosted model APIs                                  |
+| Desktop app and iOS app | None                                                      | The owner's view and input                                                     | The server                                                    |
+| Event store (SQLite)    | None                                                      | The server's state, in T3 Code's event shape plus Clyde's tables               | Litestream to R2                                              |
+| Worker log (SQLite)     | None                                                      | Each run's events until the server confirms them                               | None                                                          |
+| Log files               | None                                                      | Full agent and gate logs                                                       | restic to R2                                                  |
 
 ## Modules
 

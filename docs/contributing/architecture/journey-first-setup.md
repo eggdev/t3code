@@ -3,13 +3,13 @@
 The owner installs Clyde once, on one machine, and then reaches it from every
 other device on the tailnet.
 
-| Question                          | Answer                                                                                     |
-| --------------------------------- | ------------------------------------------------------------------------------------------ |
-| Where does Clyde run?             | The Mac mini, as a launchd service that starts at boot with no login.                      |
-| Where do agents work?             | Chat sessions on the Mac mini. Ticket runs in sandboxes on the DGX Spark or a remote host. |
-| Which devices are clients?        | Every laptop and the iPhone. Each one runs the desktop app or the iOS app.                 |
-| How does a client sign in?        | With the owner's Tailscale identity. No pairing link, no QR code and no password.          |
-| How many Clyde servers are there? | One. A client never starts its own server.                                                 |
+| Question                          | Answer                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| Where does Clyde run?             | The Mac mini, as a launchd service that starts at boot with no login.             |
+| Where do agents work?             | In sandboxes on the project's sandbox host, for chats and ticket runs alike.      |
+| Which devices are clients?        | Every laptop and the iPhone. Each one runs the desktop app or the iOS app.        |
+| How does a client sign in?        | With the owner's Tailscale identity. No pairing link, no QR code and no password. |
+| How many Clyde servers are there? | One. A client never starts its own server.                                        |
 
 ## Rules
 
@@ -39,6 +39,8 @@ other device on the tailnet.
 4. **Add a project.** The owner picks a GitHub repository, a Linear team (and
    a Linear project, if any) and a sandbox host. Clyde gives the project the
    default workflow: plan, build, the `validate` gate, review and pull request.
+   Clyde builds the project's sandbox image on that host at once, so the first
+   chat or ticket run starts with no manual setup.
 
 ## Empty, error and offline states
 

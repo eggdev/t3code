@@ -22,8 +22,8 @@ holds them.
   code, so the reviewer does not share the author's blind spots.
 - Each sandbox host runs its own gateway, so a sandbox never needs a route to
   another machine. The Mac mini's gateway serves only its Tart VMs.
-- Chat sessions on the Mac mini use T3 Code's providers with the CLI logins on
-  the Mac mini. They do not use the gateway.
+- Chat sessions use the gateway too, because their agents run in sandboxes
+  ([0009](../decisions/0009-every-agent-in-a-sandbox.md)).
 - No code assumes that a model is hosted. A step names its provider, so a
   local model can later fill one ([project intent](../project-intent.md)).
 
