@@ -24,6 +24,9 @@ names one sandbox host.
 - An iOS sandbox is a Tart VM, never a macOS user account. A user account
   cannot keep an agent away from the Mac mini's Keychain, the push process and
   the Clyde server.
+- A folder project keeps its files in a named volume on its host, and each of
+  its chats mounts that volume. A repository project's sandbox starts from a
+  fresh checkout.
 - Adding a project builds its sandbox image on its host at once. A chat or a
   ticket run never waits for a first setup.
 - A Clyde worker runs on each host. The Spark worker serves Linux projects.

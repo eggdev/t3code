@@ -36,11 +36,19 @@ other device on the tailnet.
 3. **Connect Linear.** An empty Clyde shows one action: **Connect Linear**.
    OAuth opens in the browser with `actor=app`. Clyde saves the token on the
    Mac mini and lists the teams in the workspace.
-4. **Add a project.** The owner picks a GitHub repository, a Linear team (and
-   a Linear project, if any) and a sandbox host. Clyde gives the project the
-   default workflow: plan, build, the `validate` gate, review and pull request.
-   Clyde builds the project's sandbox image on that host at once, so the first
-   chat or ticket run starts with no manual setup.
+4. **Add a project.** The owner picks a sandbox host and one of three paths:
+   - **Existing repository.** A GitHub repository, and a Linear team (and a
+     Linear project, if any).
+   - **New repository.** Clyde runs `gh repo create` as the owner, private,
+     from a template the owner picks, and commits `.clyde/workflow.yaml`.
+   - **Folder.** A persistent folder in a volume on the sandbox host, with no
+     Git. The owner only chats in it. It has no gates and no pull requests.
+     **Publish to GitHub** later turns it into a new repository.
+
+   A project with a repository gets the default workflow: plan, build, the
+   `validate` gate, review and pull request. Clyde builds the project's
+   sandbox image on its host at once, so the first chat or ticket run starts
+   with no manual setup.
 
 ## Empty, error and offline states
 
