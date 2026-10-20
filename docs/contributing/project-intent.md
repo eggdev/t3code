@@ -151,9 +151,8 @@ Each hard invariant has one journey that proves it. See
    finds none. Its push to the default branch fails. The run's own branch
    reaches GitHub through the trusted process.
 4. **No prompt is lost.** The owner replies to a ticket run, and the test kills
-   the Clyde server before the agent reads the reply. The agent's current turn
-   keeps running in its sandbox. After a restart, the agent gets the reply,
-   and the run's thread shows every step in order.
+   the Clyde server before the agent reads the reply. After a restart, the
+   agent gets the reply, and the run's thread shows every step in order.
 
 ## What not to assume
 

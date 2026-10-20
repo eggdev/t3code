@@ -1,6 +1,6 @@
 # 0010: The server drives agents; only the agent process runs in the sandbox
 
-- **Status:** accepted
+- **Status:** amended by [0011](./0011-interrupted-turns-retry.md)
 - **Date:** 2026-10-20
 
 ## Context

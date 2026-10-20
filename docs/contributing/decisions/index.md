@@ -73,7 +73,9 @@ A record amended more than once lists each amending record:
 - [0009](./0009-every-agent-in-a-sandbox.md): no agent process on the Mac
   mini; chats run in sandboxes like ticket runs.
 - [0010](./0010-agents-driven-from-the-server.md): the server drives agents;
-  only the agent CLI runs in the sandbox, and runs pause during an outage.
+  only the agent CLI runs in the sandbox.
+- [0011](./0011-interrupted-turns-retry.md): an interrupted turn retries after
+  a restart; the server does not reattach to it.
 
 ## Historical
 
