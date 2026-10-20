@@ -118,14 +118,13 @@ export const explicitBareRepositoryEnv = (env: NodeJS.ProcessEnv, platform: Node
   gitConfigEnv(env, "safe.bareRepository", "explicit", platform);
 
 /** Clyde: pins the config in clydeGitSafety.ts on every git process (security rule 25). */
-export const withClydeGitSafety = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) =>
-  CLYDE_GIT_CONFIG.reduce<NodeJS.ProcessEnv>(
-    (next, [key, value]) => ({
-      ...next,
-      ...gitConfigEnv({ ...process.env, ...next }, key, value, platform),
-    }),
-    env,
-  );
+export const withClydeGitSafety = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) => {
+  const next: NodeJS.ProcessEnv = { ...env };
+  for (const [key, value] of CLYDE_GIT_CONFIG) {
+    Object.assign(next, gitConfigEnv({ ...process.env, ...next }, key, value, platform));
+  }
+  return next;
+};
 
 const classifyNonZeroExit = (command: string, stderr: string): VcsProcessExitFailureKind => {
   const normalized = stderr.toLowerCase();

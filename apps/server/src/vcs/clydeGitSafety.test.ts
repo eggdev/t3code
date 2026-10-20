@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off -- the test runs real git against temp repositories.
 import * as NodeChildProcess from "node:child_process";
-import * as NodeFs from "node:fs";
-import * as NodeOs from "node:os";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
@@ -34,16 +34,16 @@ describe("withClydeGitSafety", () => {
   });
 
   it("does not run a hook or a monitor command planted in the repository", () => {
-    const root = NodeFs.mkdtempSync(NodePath.join(NodeOs.tmpdir(), "clyde-git-safety-"));
+    const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "clyde-git-safety-"));
     const marker = NodePath.join(root, "ran");
     const plain = { GIT_CONFIG_NOSYSTEM: "1", HOME: root };
     git(root, ["init", "-q"], plain);
     const hook = NodePath.join(root, ".git", "hooks", "pre-commit");
-    NodeFs.writeFileSync(hook, `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 });
+    NodeFS.writeFileSync(hook, `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 });
     git(root, ["config", "core.fsmonitor", `touch ${marker}`], plain);
-    NodeFs.writeFileSync(NodePath.join(root, "file.txt"), "x");
+    NodeFS.writeFileSync(NodePath.join(root, "file.txt"), "x");
 
-    const safe = withClydeGitSafety(plain, process.platform);
+    const safe = withClydeGitSafety(plain, "linux");
     expect(git(root, ["add", "file.txt"], safe).status).toBe(0);
     expect(git(root, ["status", "--porcelain"], safe).status).toBe(0);
     const commit = git(
@@ -52,7 +52,7 @@ describe("withClydeGitSafety", () => {
       safe,
     );
     expect(commit.status).toBe(0);
-    expect(NodeFs.existsSync(marker)).toBe(false);
-    NodeFs.rmSync(root, { recursive: true, force: true });
+    expect(NodeFS.existsSync(marker)).toBe(false);
+    NodeFS.rmSync(root, { recursive: true, force: true });
   });
 });
