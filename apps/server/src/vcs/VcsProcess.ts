@@ -21,6 +21,7 @@ import {
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
+import { CLYDE_GIT_CONFIG } from "./clydeGitSafety.ts";
 import * as ProcessRunner from "../processRunner.ts";
 
 export interface VcsProcessInput {
@@ -116,6 +117,16 @@ export const gitConfigEnv = (
 export const explicitBareRepositoryEnv = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) =>
   gitConfigEnv(env, "safe.bareRepository", "explicit", platform);
 
+/** Clyde: pins the config in clydeGitSafety.ts on every git process (security rule 25). */
+export const withClydeGitSafety = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform) =>
+  CLYDE_GIT_CONFIG.reduce<NodeJS.ProcessEnv>(
+    (next, [key, value]) => ({
+      ...next,
+      ...gitConfigEnv({ ...process.env, ...next }, key, value, platform),
+    }),
+    env,
+  );
+
 const classifyNonZeroExit = (command: string, stderr: string): VcsProcessExitFailureKind => {
   const normalized = stderr.toLowerCase();
 
@@ -193,10 +204,13 @@ export const make = Effect.gen(function* () {
         ...(input.spawnCwd !== undefined ? { spawnCwd: input.spawnCwd } : {}),
         ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
         ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
-        env: {
-          ...input.env,
-          ...explicitBareRepositoryEnv({ ...process.env, ...input.env }, hostPlatform),
-        },
+        env: withClydeGitSafety(
+          {
+            ...input.env,
+            ...explicitBareRepositoryEnv({ ...process.env, ...input.env }, hostPlatform),
+          },
+          hostPlatform,
+        ),
         timeout: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         maxOutputBytes: input.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
         outputMode: input.outputMode ?? "truncate",
