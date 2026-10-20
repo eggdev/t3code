@@ -631,7 +631,11 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
         } else {
           yield* Effect.logDebug("startup phase: browser open check");
           const startupBrowserTarget = yield* resolveStartupBrowserTarget;
-          if (serverConfig.mode !== "desktop") {
+          if (serverConfig.tailscaleOwnerLogin !== undefined) {
+            yield* Effect.logInfo("Signing in with Tailscale identity. No pairing URL.", {
+              owner: serverConfig.tailscaleOwnerLogin,
+            });
+          } else if (serverConfig.mode !== "desktop") {
             yield* announceStartupPairingUrl(startupBrowserTarget);
           }
           yield* runStartupPhase("browser.open", maybeOpenBrowser(startupBrowserTarget));
