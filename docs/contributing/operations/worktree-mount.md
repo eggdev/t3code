@@ -44,6 +44,7 @@ On the Spark (`ssh agent-dgx`):
    write from the Mac mini belong to the sandbox user.
 
    ```sh
+   sudo mkdir -p /etc/exports.d
    echo '/opt/clyde/worktrees 100.64.132.97(rw,sync,no_subtree_check,insecure,all_squash,anonuid=1000,anongid=1000)' \
      | sudo tee /etc/exports.d/clyde.exports
    sudo exportfs -ra && sudo exportfs -v
