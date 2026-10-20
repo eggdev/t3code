@@ -84,6 +84,7 @@ describe("SandboxAgentScope", () => {
         );
         expect(payload).toEqual({
           dir: "/opt/clyde/worktrees/proj",
+          cwd: "/opt/clyde/worktrees/proj/wt",
           command: "codex",
           args: ["app-server"],
         });
@@ -117,7 +118,13 @@ describe("SandboxAgentScope", () => {
         );
         expect(Exit.isFailure(claude) && Exit.hasDies(claude)).toBe(true);
         expect(String(Exit.isFailure(claude) ? claude.cause : "")).toContain(
-          "claude in a sandbox is not supported yet",
+          "claude in a sandbox launches through its spawn hook",
+        );
+        const cursor = yield* Effect.exit(
+          scope.wrap({ command: "cursor-agent", args: [], name: "cursor" }),
+        );
+        expect(String(Exit.isFailure(cursor) ? cursor.cause : "")).toContain(
+          "cursor in a sandbox is not supported yet",
         );
         expect(wrapped).toHaveLength(0);
       }),

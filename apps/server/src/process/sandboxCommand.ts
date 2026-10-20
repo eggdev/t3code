@@ -14,8 +14,15 @@ import type { ServerConfig } from "../config.ts";
 /** The same NFS folder on the server and on the sandbox host. */
 const SANDBOX_WORKTREE_ROOT = "/opt/clyde/worktrees";
 
-/** The only agent CLI that runs in a sandbox today. */
+/** The agent CLI that launches through the agent scope wrapper in a sandbox. */
 export const SANDBOXED_DRIVER = "codex";
+
+/**
+ * The providers that run in a sandbox. Claude launches through its own spawn
+ * hook (`sandboxClaude.ts`), because the Agent SDK adds the CLI's arguments
+ * after the wrapper runs.
+ */
+const SANDBOXED_DRIVERS: ReadonlySet<string> = new Set([SANDBOXED_DRIVER, "claudeAgent"]);
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/;
 
@@ -28,7 +35,7 @@ export class SandboxRefusedError extends Schema.TaggedError<SandboxRefusedError>
   }
 }
 
-interface SandboxSsh {
+export interface SandboxSsh {
   readonly target: string;
   readonly keyPath?: string | undefined;
 }
@@ -73,18 +80,26 @@ export function sandboxProjectDir(
   return Result.succeed(`${SANDBOX_WORKTREE_ROOT}/${project}`);
 }
 
-/** The ssh command that runs `command args` in a container on the sandbox host. */
+/**
+ * The ssh command that runs `command args` in a container on the sandbox host.
+ * The container mounts the project's top folder and starts in `cwd`. `env`
+ * goes to the CLI. The host refuses a name that would change its own security
+ * settings, so callers pass only an allowlisted set.
+ */
 export function sandboxCommand(input: {
   readonly sandbox: SandboxSsh;
   readonly cwd: string | null | undefined;
   readonly command: string;
   readonly args: ReadonlyArray<string>;
+  readonly env?: Readonly<Record<string, string>> | undefined;
 }): Result.Result<AgentScopeCommand, SandboxRefusedError> {
   return Result.map(sandboxProjectDir(input.cwd), (dir) => {
     const payload = JSON.stringify({
       dir,
+      cwd: input.cwd,
       command: input.command.split(/[\\/]/).pop() ?? input.command,
       args: input.args,
+      ...(input.env === undefined || Object.keys(input.env).length === 0 ? {} : { env: input.env }),
     });
     return {
       command: "ssh",
@@ -115,15 +130,15 @@ function driverLabel(driver: string): string {
 
 /**
  * Why a provider session must not open in sandbox mode, or `undefined` when
- * it may. Only Codex runs in a sandbox today; every other provider would run
- * on the server, so it fails instead.
+ * it may. Only Codex and Claude run in a sandbox today; every other provider
+ * would run on the server, so it fails instead.
  */
 export function sandboxSessionRefusal(
   sandbox: SandboxSsh | undefined,
   input: { readonly driver: string; readonly cwd: string | null },
 ): SandboxRefusedError | undefined {
   if (sandbox === undefined) return undefined;
-  if (input.driver !== SANDBOXED_DRIVER) {
+  if (!SANDBOXED_DRIVERS.has(input.driver)) {
     return new SandboxRefusedError({
       reason: `${driverLabel(input.driver)} in a sandbox is not supported yet`,
     });

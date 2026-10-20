@@ -3,9 +3,16 @@
 
 The Clyde server reaches this script through an SSH key whose authorized_keys
 entry forces it as the command. SSH_ORIGINAL_COMMAND is `run <payload>`, where
-the payload is base64 JSON: {"dir": <worktree dir>, "command": <cli>, "args": [...]}.
-The script mounts only `dir`, which must sit under the worktree root, and runs
-only an allowed CLI. Standard input and output pass straight through.
+the payload is base64 JSON: {"dir": <worktree dir>, "command": <cli>,
+"args": [...], "cwd": <folder in dir>, "env": {NAME: value}}. `cwd` and `env`
+are optional. The script mounts only `dir`, which must sit under the worktree
+root, and runs only an allowed CLI. `env` cannot change the script's own
+settings or carry a credential. Standard input and output pass straight
+through.
+
+Claude keeps its home (CLAUDE_CONFIG_DIR) in `<dir>/.clyde/claude-home`, on the
+shared worktree mount, so the Clyde server reads its session files at the same
+path. Keep the path in step with `apps/server/src/process/sandboxClaude.ts`.
 """
 import base64
 import json
@@ -22,6 +29,19 @@ GATEWAY = "http://model-gateway:8080"
 EGRESS = "http://public-egress:8083"
 ALLOWED = {"codex", "claude"}
 SEGMENT = re.compile(r"^[A-Za-z0-9._-]+$")
+CLAUDE_HOME = ".clyde/claude-home"
+ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
+# Names the script sets itself, or that would change where the agent's traffic
+# or code comes from. A name with a credential or proxy word is refused too.
+RESERVED_ENV = {
+    "HOME", "PATH", "USER", "SHELL", "NODE_OPTIONS", "NODE_EXTRA_CA_CERTS",
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+    "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN",
+}
+RESERVED_ENV_PREFIXES = ("ANTHROPIC_", "OPENAI_", "CODEX_", "LD_", "DOCKER_", "SSL_")
+REFUSED_WORDS = ("TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL", "AUTH", "PROXY")
+MAX_ENV = 32
+MAX_ENV_VALUE = 4096
 
 CODEX_GATEWAY_ARGS = [
     "-c", 'model_provider="gateway"',
@@ -51,12 +71,35 @@ def parse(original):
         payload = json.loads(base64.b64decode(parts[1], validate=True))
     except Exception:
         refuse("payload is not base64 JSON")
+    if not isinstance(payload, dict):
+        refuse("payload must be a JSON object")
     directory, command, args = payload.get("dir"), payload.get("command"), payload.get("args", [])
     if not isinstance(directory, str) or not isinstance(command, str) or not isinstance(args, list):
         refuse("payload needs dir, command and args")
     if not all(isinstance(arg, str) for arg in args):
         refuse("every arg must be a string")
-    return directory, command, args
+    cwd = payload.get("cwd", directory)
+    if not isinstance(cwd, str):
+        refuse("cwd must be a string")
+    return directory, cwd, command, args, check_env(payload.get("env", {}))
+
+
+def check_env(env):
+    """The caller's variables for the CLI, or a refusal."""
+    if not isinstance(env, dict) or len(env) > MAX_ENV:
+        refuse(f"env must be an object with at most {MAX_ENV} names")
+    for name, value in env.items():
+        if not ENV_NAME.match(name):
+            refuse(f"env name {name!r} is not allowed")
+        if (
+            name in RESERVED_ENV
+            or name.startswith(RESERVED_ENV_PREFIXES)
+            or any(word in name for word in REFUSED_WORDS)
+        ):
+            refuse(f"env name {name} is reserved")
+        if not isinstance(value, str) or len(value) > MAX_ENV_VALUE or "\0" in value:
+            refuse(f"env value for {name} must be a short string")
+    return env
 
 
 def project_of(directory):
@@ -71,11 +114,40 @@ def project_of(directory):
     return real, segments[0]
 
 
+def workdir_in(real, cwd):
+    """The container's start folder: `cwd`, which must sit in the mounted dir."""
+    resolved = os.path.realpath(cwd)
+    if resolved != real and not resolved.startswith(real + "/"):
+        refuse("cwd must sit in dir")
+    if not os.path.isdir(resolved):
+        refuse("cwd does not exist")
+    return resolved
+
+
+def claude_home(real):
+    """Make the project's Claude home and keep it out of git in the top folder."""
+    home = os.path.join(real, CLAUDE_HOME)
+    if os.path.islink(os.path.join(real, ".clyde")) or os.path.islink(home):
+        refuse("the Claude home must not be a link")
+    os.makedirs(home, mode=0o700, exist_ok=True)
+    git_info = os.path.join(real, ".git", "info")
+    if os.path.isdir(git_info) and not os.path.islink(git_info):
+        exclude = os.path.join(git_info, "exclude")
+        lines = open(exclude).read().splitlines() if os.path.isfile(exclude) else []
+        if "/.clyde/" not in lines:
+            with open(exclude, "a") as file:
+                file.write("/.clyde/\n")
+    return home
+
+
 def main():
-    directory, command, args = parse(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
+    directory, cwd, command, args, env = parse(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
     if command not in ALLOWED:
         refuse(f"command must be one of {sorted(ALLOWED)}")
     real, project = project_of(directory)
+    workdir = workdir_in(real, cwd)
+    claude = ["-e", f"CLAUDE_CONFIG_DIR={claude_home(real)}"] if command == "claude" else []
+    caller_env = [arg for name, value in env.items() for arg in ("-e", f"{name}={value}")]
     home = os.path.join(HOME_ROOT, project)
     os.makedirs(home, exist_ok=True)
     cli = [command, *with_gateway(args)] if command == "codex" else [command, *args]
@@ -95,9 +167,11 @@ def main():
         # owner's subscription token. Codex gets its gateway from -c flags.
         "-e", f"ANTHROPIC_BASE_URL={GATEWAY}/anthropic",
         "-e", "ANTHROPIC_AUTH_TOKEN=clyde-gateway-placeholder",
+        *claude,
+        *caller_env,
         "-v", f"{home}:/home/agent",
         "-v", f"{real}:{real}",
-        "-w", real,
+        "-w", workdir,
         IMAGE,
         *cli,
     ]

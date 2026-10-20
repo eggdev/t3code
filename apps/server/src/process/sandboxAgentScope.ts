@@ -3,7 +3,8 @@
  * 0010). It wraps the live agent scope. With no sandbox target it is the live
  * scope. In sandbox mode a Codex launch becomes an ssh command to the sandbox
  * host, which the live scope then wraps like any other command. Terminals pass
- * through unchanged. Every other agent fails, so no agent runs on the server.
+ * through unchanged. Claude launches through its own spawn hook instead. Every
+ * other agent fails, so no agent runs on the server.
  */
 import { AgentScope, type AgentScopeShape } from "@t3tools/shared/AgentScope";
 import * as Effect from "effect/Effect";
@@ -33,7 +34,12 @@ export const make = Effect.gen(function* () {
     // other launch, so nothing runs an agent on the server by mistake.
     if (input.name !== SANDBOXED_DRIVER) {
       return yield* Effect.die(
-        new SandboxRefusedError({ reason: `${input.name} in a sandbox is not supported yet` }),
+        new SandboxRefusedError({
+          reason:
+            input.name === "claude"
+              ? "claude in a sandbox launches through its spawn hook (sandboxClaude.ts)"
+              : `${input.name} in a sandbox is not supported yet`,
+        }),
       );
     }
     const command = sandboxCommand({

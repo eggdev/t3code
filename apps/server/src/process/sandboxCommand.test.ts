@@ -1,5 +1,5 @@
 import * as Result from "effect/Result";
-import { describe, expect, it } from "vite-plus/test";
+import { assert, describe, expect, it } from "vite-plus/test";
 
 import {
   sandboxCommand,
@@ -88,9 +88,37 @@ describe("sandboxCommand", () => {
     ]);
     expect(decodePayload(result.success.args)).toEqual({
       dir: "/opt/clyde/worktrees/proj",
+      cwd: "/opt/clyde/worktrees/proj/sub",
       command: "codex",
       args: ["app-server", "--flag", "a b"],
     });
+  });
+
+  it("puts env in the payload only when it has names", () => {
+    const withEnv = sandboxCommand({
+      sandbox,
+      cwd: "/opt/clyde/worktrees/proj",
+      command: "claude",
+      args: ["--print"],
+      env: { CLAUDE_CODE_ENTRYPOINT: "sdk-ts" },
+    });
+    assert(Result.isSuccess(withEnv));
+    expect(decodePayload(withEnv.success.args)).toEqual({
+      dir: "/opt/clyde/worktrees/proj",
+      cwd: "/opt/clyde/worktrees/proj",
+      command: "claude",
+      args: ["--print"],
+      env: { CLAUDE_CODE_ENTRYPOINT: "sdk-ts" },
+    });
+    const empty = sandboxCommand({
+      sandbox,
+      cwd: "/opt/clyde/worktrees/proj",
+      command: "claude",
+      args: [],
+      env: {},
+    });
+    assert(Result.isSuccess(empty));
+    expect(decodePayload(empty.success.args)).not.toHaveProperty("env");
   });
 
   it("leaves out -i without a key path", () => {
@@ -126,8 +154,15 @@ describe("sandboxSessionRefusal", () => {
     );
   });
 
+  it("allows Claude in a project folder and refuses it outside", () => {
+    expect(sandboxSessionRefusal(sandbox, { driver: "claudeAgent", cwd })).toBeUndefined();
+    expect(sandboxSessionRefusal(sandbox, { driver: "claudeAgent", cwd: "/tmp" })?._tag).toBe(
+      "SandboxRefusedError",
+    );
+  });
+
   it.each([
-    ["claudeAgent", "Claude in a sandbox is not supported yet"],
+    ["claude", "Claude in a sandbox is not supported yet"],
     ["cursor", "Cursor in a sandbox is not supported yet"],
     ["opencode", "Opencode in a sandbox is not supported yet"],
   ])("refuses %s", (driver, message) => {

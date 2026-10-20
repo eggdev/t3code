@@ -129,6 +129,12 @@ import {
   type CompiledClaudeModelSelection,
 } from "../../claudeModelOptions.ts";
 import * as ServerConfig from "../../config.ts";
+import {
+  makeSandboxClaudeSpawn,
+  SANDBOX_CLAUDE_QUERY_OPTIONS,
+} from "../../process/sandboxClaude.ts";
+import { sandboxSshOf } from "../../process/sandboxCommand.ts";
+import { withSandboxClaudeHomes } from "./sandboxClaudeAdapter.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import { spawnAndCollect } from "@t3tools/provider-core/server/snapshotProbe";
 import { signalProcessGroup } from "@t3tools/provider-core/server/processGroup";
@@ -868,6 +874,11 @@ export const layerQueryRunner: Layer.Layer<
     const { native: nativeEventLogger } = yield* ProviderEventLoggers.ProviderEventLoggers;
     const agentScope = yield* AgentScope;
     const platform = yield* HostProcess.Platform;
+    // Clyde: in sandbox mode the CLI runs in a container on the sandbox host.
+    const sandboxSpawn = makeSandboxClaudeSpawn(
+      sandboxSshOf(Option.getOrUndefined(yield* Effect.serviceOption(ServerConfig.ServerConfig))),
+      spawnClaudeProcessGroup,
+    );
 
     return ClaudeAgentSdkQueryRunner.of({
       allocateSessionId: crypto
@@ -894,12 +905,16 @@ export const layerQueryRunner: Layer.Layer<
         // which every local user can read. They go over the CLI's stdin control
         // channel instead, so header credentials stay out of its argv and out
         // of the environment every command the agent runs inherits.
-        const { mcpServers, ...queryOptions } = input.options;
+        const { mcpServers, ...queryOptions } =
+          sandboxSpawn === undefined
+            ? input.options
+            : { ...input.options, ...SANDBOX_CLAUDE_QUERY_OPTIONS };
         // The SDK spawns a native binary as `path ...executableArgs ...sdkArgs`,
         // which lets the agent scope wrapper go in front of the CLI. The SDK
         // runs a script entry through node instead, so those launch unwrapped.
         const binaryPath = queryOptions.pathToClaudeCodeExecutable;
         const launch =
+          sandboxSpawn !== undefined ||
           binaryPath === undefined ||
           CLAUDE_SCRIPT_EXTENSIONS.some((ext) => binaryPath.endsWith(ext))
             ? undefined
@@ -920,6 +935,7 @@ export const layerQueryRunner: Layer.Layer<
               };
         // Windows has no process groups, so there the SDK spawns the CLI itself.
         const spawnClaudeCodeProcess =
+          sandboxSpawn ??
           options.spawnClaudeCodeProcess ??
           (platform === "win32" ? undefined : spawnClaudeProcessGroup);
         const queryRuntime = yield* Effect.uninterruptibleMask((restore) =>
@@ -10322,7 +10338,7 @@ export type ClaudeAdapterV2DriverEnv =
   | Path.Path
   | ServerConfig.ServerConfig;
 
-export const createClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2Driver.create")(
+const createLocalClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2Driver.create")(
   function* (
     input: ProviderAdapterDriverCreateInput<ClaudeSettings>,
     hooks: Pick<ClaudeAdapterV2Options, "scopedLimitNames" | "onUsageLimits"> = {},
@@ -10369,6 +10385,12 @@ export const createClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2Driver.create")(
       ),
     ),
 );
+
+// Clyde: in sandbox mode each project gets its own Claude home.
+export const createClaudeAdapterV2 = (
+  input: ProviderAdapterDriverCreateInput<ClaudeSettings>,
+  hooks: Pick<ClaudeAdapterV2Options, "scopedLimitNames" | "onUsageLimits"> = {},
+) => withSandboxClaudeHomes(input, (homeInput) => createLocalClaudeAdapterV2(homeInput, hooks));
 
 export const ClaudeAdapterV2Driver: ProviderAdapterDriver<
   ClaudeSettings,

@@ -32,6 +32,11 @@ names one sandbox host.
 - A thread's worktree is the same files at the same path on the server and in
   its sandbox, through a mount
   ([0010](../decisions/0010-agents-driven-from-the-server.md)).
+- Claude keeps its home in `.clyde/claude-home` in the project's top folder,
+  on the same mount. The server reads the session files there to resume, fork
+  and roll back a thread. The server sends the CLI only an allowlisted set of
+  variables, and `clyde-sandbox-exec` refuses any name that would change its
+  own settings or carry a credential.
 - A Clyde worker runs on each host. The Spark worker serves Linux projects.
   A second worker on the Mac mini drives the Tart VMs for iOS projects.
 
